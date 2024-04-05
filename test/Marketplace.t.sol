@@ -3,21 +3,15 @@ pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {Marketplace, Trade} from "../src/Marketplace.sol";
+import {Marketplace, InvalidSigner} from "../src/Marketplace.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 
-contract MarketplaceHarness is Marketplace {
-    function getDomainSeparator() external view returns (bytes32) {
-        return _domainSeparatorV4();
-    }
-}
-
-contract MarketplaceTest is Test {
+contract Accept is Test {
     function setUp() public {}
 
-    function test_Accept() public {
+    function test_InvalidSigner() public {
         // Instantiate the Marketplace contract.
-        MarketplaceHarness marketplace = new MarketplaceHarness();
+        Marketplace marketplace = new Marketplace();
         // Instantiate the MockERC20 contract.
         MockERC20 erc20 = new MockERC20();
 
@@ -48,17 +42,15 @@ contract MarketplaceTest is Test {
 
         // Get the digest.
         bytes32 digest = MessageHashUtils.toTypedDataHash(
-            domainSeparator, keccak256(abi.encode(keccak256("Trade(bool testBool)"), true))
+            domainSeparator, keccak256(abi.encode(marketplace.TRADE_TYPEHASH, true))
         );
 
         // Create the signature.
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
 
-        console.logUint(v);
-        console.logBytes32(r);
-        console.logBytes32(s);
-
+        // Call
         vm.prank(caller);
-        marketplace.accept(Trade({signer: signer, signature: abi.encodePacked(r, s, v), testBool: true}));
+        vm.expectRevert(InvalidSigner.selector);
+        marketplace.accept(Marketplace.Trade({signer: signer, signature: abi.encodePacked(r, s, v), testBool: false}));
     }
 }
