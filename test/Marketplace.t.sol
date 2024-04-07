@@ -6,51 +6,71 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 import {Marketplace, InvalidSigner} from "../src/Marketplace.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 
+contract MarketplaceHarness is Marketplace {
+    function getDomainSeparator() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
+    function hashAssets(Asset[] memory assets) external pure returns (bytes memory) {
+        return _hashAssets(assets);
+    }
+
+    function getAssetTypeHash() external pure returns (bytes32) {
+        return ASSET_TYPE_HASH;
+    }
+
+    function getTradeTypeHash() external pure returns (bytes32) {
+        return TRADE_TYPE_HASH;
+    }
+}
+
 contract Accept is Test {
     function setUp() public {}
 
-    function test_InvalidSigner() public {
-        // Instantiate the Marketplace contract.
-        Marketplace marketplace = new Marketplace();
-        // Instantiate the MockERC20 contract.
+    function test_Success() public {
+        uint256 signerPk = 0xB0C4;
+
+        address signer = vm.addr(signerPk);
+        address caller = vm.addr(signerPk + 1);
+
+        MarketplaceHarness mkt = new MarketplaceHarness();
+
         MockERC20 erc20 = new MockERC20();
 
-        // Private key of the signer.
-        uint256 signerPrivateKey = 1;
-        // Private key of the caller.
-        uint256 callerPrivateKey = 2;
-
-        // Address of the signer;
-        address signer = vm.addr(signerPrivateKey);
-        // Address of the caller;
-        address caller = vm.addr(callerPrivateKey);
-
-        // Mint 1 ether to the signer.
         erc20.mint(signer, 1 ether);
-        // Mint 1 ether to the caller.
         erc20.mint(caller, 1 ether);
 
-        // Allow the marketplace to spend 1 ether of the signer's balance.
         vm.prank(signer);
-        erc20.approve(address(marketplace), 1 ether);
-        // Allow the marketplace to spend 1 ether of the caller's balance.
+        erc20.approve(address(mkt), 1 ether);
+
         vm.prank(caller);
-        erc20.approve(address(marketplace), 1 ether);
+        erc20.approve(address(mkt), 1 ether);
 
-        // Get the domain separator of the marketplace contract.
-        bytes32 domainSeparator = marketplace.getDomainSeparator();
+        assertEq(erc20.balanceOf(signer), 1 ether);
+        assertEq(erc20.balanceOf(caller), 1 ether);
 
-        // Get the digest.
+        Marketplace.Asset[] memory sent = new Marketplace.Asset[](1);
+        sent[0] = Marketplace.Asset({contractAddress: address(erc20), amount: 0.75 ether});
+
+        Marketplace.Asset[] memory received = new Marketplace.Asset[](1);
+        received[0] = Marketplace.Asset({contractAddress: address(erc20), amount: 0.25 ether});
+
         bytes32 digest = MessageHashUtils.toTypedDataHash(
-            domainSeparator, keccak256(abi.encode(marketplace.TRADE_TYPEHASH, true))
+            mkt.getDomainSeparator(),
+            keccak256(abi.encode(mkt.getTradeTypeHash(), mkt.hashAssets(sent), mkt.hashAssets(received)))
         );
 
-        // Create the signature.
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
 
-        // Call
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        Marketplace.Trade memory trade =
+            Marketplace.Trade({signer: signer, signature: signature, sent: sent, received: received});
+
         vm.prank(caller);
-        vm.expectRevert(InvalidSigner.selector);
-        marketplace.accept(Marketplace.Trade({signer: signer, signature: abi.encodePacked(r, s, v), testBool: false}));
+        mkt.accept(trade);
+
+        assertEq(erc20.balanceOf(signer), 0.5 ether);
+        assertEq(erc20.balanceOf(caller), 1.5 ether);
     }
 }
