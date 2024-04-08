@@ -29,6 +29,38 @@ contract MarketplaceHarness is Marketplace {
 contract Accept is Test {
     function setUp() public {}
 
+    function test_InvalidSignature() public {
+        uint256 signerPk = 0xB0C4;
+        
+        address caller = vm.addr(signerPk + 1);
+
+        MarketplaceHarness mkt = new MarketplaceHarness();
+        
+        Marketplace.Asset[] memory sent = new Marketplace.Asset[](1);
+        Marketplace.Asset[] memory received = new Marketplace.Asset[](0);
+
+        bytes32 digest = MessageHashUtils.toTypedDataHash(
+            mkt.getDomainSeparator(),
+            keccak256(abi.encode(mkt.getTradeTypeHash(), mkt.hashAssets(sent), mkt.hashAssets(received)))
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+        
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        Marketplace.Trade memory trade = Marketplace.Trade({
+            // the signer address would be correct in this case, but another one is being sent, so the InvalidSigner error should be expected.
+            signer: caller,
+            signature: signature,
+            sent: sent,
+            received: received
+        });
+
+        vm.prank(caller);
+        vm.expectRevert(InvalidSigner.selector);
+        mkt.accept(trade);
+    }
+
     function test_SuccessERC20() public {
         uint256 signerPk = 0xB0C4;
 
