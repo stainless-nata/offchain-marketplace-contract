@@ -8,12 +8,13 @@ import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 import {ICollection} from "./interfaces/ICollection.sol";
 
 error InvalidSigner();
+error Expired();
 
 contract Marketplace is EIP712 {
     // keccak256("Asset(uint8 assetType,address contractAddress,uint256 amountOrTokenId)")
     bytes32 internal constant ASSET_TYPE_HASH = 0xca6dc34521a1a16a3c61f9d8d9dbb453951798636529b1dbc7cf94741d77dee3;
-    // keccak256("Trade(Asset[] sent, Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 amountOrTokenId)")
-    bytes32 internal constant TRADE_TYPE_HASH = 0x781907fd28d2e46fc07161b51e5b581feb8befb91ac787388809696a4b68c772;
+    // keccak256("Trade(uint256 expiration,Asset[] sent, Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 amountOrTokenId)")
+    bytes32 internal constant TRADE_TYPE_HASH = 0x9d49c7e9085f54e2e1b874043489c1fb55b91ee90f4a15f6b9cc7dfb0aa276d7;
 
     enum AssetType {
         ERC20,
@@ -29,6 +30,7 @@ contract Marketplace is EIP712 {
 
     struct Trade {
         address signer;
+        uint256 expiration;
         bytes signature;
         Asset[] sent;
         Asset[] received;
@@ -37,9 +39,17 @@ contract Marketplace is EIP712 {
     constructor() EIP712("Marketplace", "0.0.1") {}
 
     function accept(Trade calldata _trade) external {
+        if (_trade.expiration < block.timestamp) {
+            revert Expired();
+        }
+
         address recovered = ECDSA.recover(
             _hashTypedDataV4(
-                keccak256(abi.encode(TRADE_TYPE_HASH, _hashAssets(_trade.sent), _hashAssets(_trade.received)))
+                keccak256(
+                    abi.encode(
+                        TRADE_TYPE_HASH, _trade.expiration, _hashAssets(_trade.sent), _hashAssets(_trade.received)
+                    )
+                )
             ),
             _trade.signature
         );
