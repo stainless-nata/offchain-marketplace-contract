@@ -5,6 +5,7 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
+import {ICollection} from "./interfaces/ICollection.sol";
 
 error InvalidSigner();
 
@@ -16,7 +17,8 @@ contract Marketplace is EIP712 {
 
     enum AssetType {
         ERC20,
-        ERC721
+        ERC721,
+        ITEM
     }
 
     struct Asset {
@@ -64,8 +66,16 @@ contract Marketplace is EIP712 {
         for (uint256 i = 0; i < _assets.length; i++) {
             if (_assets[i].assetType == AssetType.ERC20) {
                 IERC20(_assets[i].contractAddress).transferFrom(_from, _to, _assets[i].amountOrTokenId);
-            } else {
+            } else if (_assets[i].assetType == AssetType.ERC721) {
                 IERC721(_assets[i].contractAddress).safeTransferFrom(_from, _to, _assets[i].amountOrTokenId);
+            } else {
+                address[] memory beneficiaries = new address[](1);
+                beneficiaries[0] = _to;
+
+                uint256[] memory itemIds = new uint256[](1);
+                itemIds[0] = _assets[i].amountOrTokenId;
+
+                ICollection(_assets[i].contractAddress).issueTokens(beneficiaries, itemIds);
             }
         }
     }

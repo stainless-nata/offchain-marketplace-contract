@@ -6,6 +6,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 import {Marketplace, InvalidSigner} from "../src/Marketplace.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {MockERC721} from "../src/mocks/MockERC721.sol";
+import {MockCollection} from "../src/mocks/MockCollection.sol";
 
 contract MarketplaceHarness is Marketplace {
     function getDomainSeparator() external view returns (bytes32) {
@@ -136,5 +137,45 @@ contract Accept is Test {
 
         assertEq(erc721.ownerOf(1), caller);
         assertEq(erc721.ownerOf(2), signer);
+    }
+
+    function test_SuccessCollectionItemMint() public {
+        uint256 signerPk = 0xB0C4;
+
+        address signer = vm.addr(signerPk);
+        address caller = vm.addr(signerPk + 1);
+
+        MarketplaceHarness mkt = new MarketplaceHarness();
+
+        MockCollection collection = new MockCollection();
+
+        Marketplace.Asset[] memory sent = new Marketplace.Asset[](1);
+        sent[0] = Marketplace.Asset({
+            assetType: Marketplace.AssetType.ITEM,
+            contractAddress: address(collection),
+            amountOrTokenId: 1
+        });
+
+        Marketplace.Asset[] memory received = new Marketplace.Asset[](1);
+        received[0] = Marketplace.Asset({
+            assetType: Marketplace.AssetType.ITEM,
+            contractAddress: address(collection),
+            amountOrTokenId: 2
+        });
+
+        bytes32 digest = MessageHashUtils.toTypedDataHash(
+            mkt.getDomainSeparator(),
+            keccak256(abi.encode(mkt.getTradeTypeHash(), mkt.hashAssets(sent), mkt.hashAssets(received)))
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        Marketplace.Trade memory trade =
+            Marketplace.Trade({signer: signer, signature: signature, sent: sent, received: received});
+
+        vm.prank(caller);
+        mkt.accept(trade);
     }
 }
