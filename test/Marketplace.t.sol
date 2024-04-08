@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {Marketplace, InvalidSigner, Expired} from "../src/Marketplace.sol";
+import {Marketplace, InvalidSigner, Expired, NotAllowed} from "../src/Marketplace.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {MockERC721} from "../src/mocks/MockERC721.sol";
 import {MockCollection} from "../src/mocks/MockCollection.sol";
@@ -74,18 +74,21 @@ contract Accept is Test {
     }
 
     function test_InvalidSignature() public {
-        uint256 signerPk = 0xB0C4;
-
-        address caller = vm.addr(signerPk + 1);
-
-        MarketplaceHarness mkt = new MarketplaceHarness();
-
+        address[] memory allowed = new address[](0);
         Marketplace.Asset[] memory sent = new Marketplace.Asset[](0);
         Marketplace.Asset[] memory received = new Marketplace.Asset[](0);
 
         bytes32 digest = MessageHashUtils.toTypedDataHash(
             mkt.getDomainSeparator(),
-            keccak256(abi.encode(mkt.getTradeTypeHash(), mkt.hashAssets(sent), mkt.hashAssets(received)))
+            keccak256(
+                abi.encode(
+                    mkt.getTradeTypeHash(),
+                    expiration,
+                    abi.encodePacked(allowed),
+                    mkt.hashAssets(sent),
+                    mkt.hashAssets(received)
+                )
+            )
         );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
@@ -96,6 +99,7 @@ contract Accept is Test {
             // The signer address would be correct in this case, but another one is being sent, so the InvalidSigner error should be expected.
             signer: caller,
             expiration: block.timestamp + 1,
+            allowed: allowed,
             signature: signature,
             sent: sent,
             received: received
@@ -107,18 +111,21 @@ contract Accept is Test {
     }
 
     function test_Expiration() public {
-        uint256 signerPk = 0xB0C4;
-
-        address caller = vm.addr(signerPk + 1);
-
-        MarketplaceHarness mkt = new MarketplaceHarness();
-
+        address[] memory allowed = new address[](0);
         Marketplace.Asset[] memory sent = new Marketplace.Asset[](0);
         Marketplace.Asset[] memory received = new Marketplace.Asset[](0);
 
         bytes32 digest = MessageHashUtils.toTypedDataHash(
             mkt.getDomainSeparator(),
-            keccak256(abi.encode(mkt.getTradeTypeHash(), mkt.hashAssets(sent), mkt.hashAssets(received)))
+            keccak256(
+                abi.encode(
+                    mkt.getTradeTypeHash(),
+                    expiration,
+                    abi.encodePacked(allowed),
+                    mkt.hashAssets(sent),
+                    mkt.hashAssets(received)
+                )
+            )
         );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
@@ -127,7 +134,9 @@ contract Accept is Test {
 
         Marketplace.Trade memory trade = Marketplace.Trade({
             signer: caller,
+            // Espiration is set to a past date, so the Expired error should be expected.
             expiration: block.timestamp - 1,
+            allowed: allowed,
             signature: signature,
             sent: sent,
             received: received
@@ -138,7 +147,49 @@ contract Accept is Test {
         mkt.accept(trade);
     }
 
+    function test_NotAllowed() public {
+        address[] memory allowed = new address[](1);
+        // Given that the only allowed address is the signer address, when the caller calls the trade accept function, it should fail.
+        allowed[0] = signer;
+
+        Marketplace.Asset[] memory sent = new Marketplace.Asset[](0);
+        Marketplace.Asset[] memory received = new Marketplace.Asset[](0);
+
+        bytes32 digest = MessageHashUtils.toTypedDataHash(
+            mkt.getDomainSeparator(),
+            keccak256(
+                abi.encode(
+                    mkt.getTradeTypeHash(),
+                    expiration,
+                    abi.encodePacked(allowed),
+                    mkt.hashAssets(sent),
+                    mkt.hashAssets(received)
+                )
+            )
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        Marketplace.Trade memory trade = Marketplace.Trade({
+            signer: caller,
+            // Espiration is set to a past date, so the Expired error should be expected.
+            expiration: expiration,
+            allowed: allowed,
+            signature: signature,
+            sent: sent,
+            received: received
+        });
+
+        vm.prank(caller);
+        vm.expectRevert(NotAllowed.selector);
+        mkt.accept(trade);
+    }
+
     function test_Success() public {
+        address[] memory allowed = new address[](0);
+
         Marketplace.Asset[] memory sent = new Marketplace.Asset[](3);
         sent[0] = Marketplace.Asset({
             assetType: Marketplace.AssetType.ERC20,
@@ -175,7 +226,15 @@ contract Accept is Test {
 
         bytes32 digest = MessageHashUtils.toTypedDataHash(
             mkt.getDomainSeparator(),
-            keccak256(abi.encode(mkt.getTradeTypeHash(), expiration, mkt.hashAssets(sent), mkt.hashAssets(received)))
+            keccak256(
+                abi.encode(
+                    mkt.getTradeTypeHash(),
+                    expiration,
+                    abi.encodePacked(allowed),
+                    mkt.hashAssets(sent),
+                    mkt.hashAssets(received)
+                )
+            )
         );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
@@ -185,6 +244,7 @@ contract Accept is Test {
         Marketplace.Trade memory trade = Marketplace.Trade({
             signer: signer,
             expiration: expiration,
+            allowed: allowed,
             signature: signature,
             sent: sent,
             received: received

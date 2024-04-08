@@ -9,12 +9,13 @@ import {ICollection} from "./interfaces/ICollection.sol";
 
 error InvalidSigner();
 error Expired();
+error NotAllowed();
 
 contract Marketplace is EIP712 {
     // keccak256("Asset(uint8 assetType,address contractAddress,uint256 amountOrTokenId)")
     bytes32 internal constant ASSET_TYPE_HASH = 0xca6dc34521a1a16a3c61f9d8d9dbb453951798636529b1dbc7cf94741d77dee3;
-    // keccak256("Trade(uint256 expiration,Asset[] sent, Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 amountOrTokenId)")
-    bytes32 internal constant TRADE_TYPE_HASH = 0x9d49c7e9085f54e2e1b874043489c1fb55b91ee90f4a15f6b9cc7dfb0aa276d7;
+    // keccak256("Trade(uint256 expiration,address[] allowed,Asset[] sent, Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 amountOrTokenId)")
+    bytes32 internal constant TRADE_TYPE_HASH = 0xd83ee2d02f12bec5d57bb118fb4b6708e301d288926af6ff854b9518ab7b64d5;
 
     enum AssetType {
         ERC20,
@@ -31,6 +32,7 @@ contract Marketplace is EIP712 {
     struct Trade {
         address signer;
         uint256 expiration;
+        address[] allowed;
         bytes signature;
         Asset[] sent;
         Asset[] received;
@@ -43,11 +45,27 @@ contract Marketplace is EIP712 {
             revert Expired();
         }
 
+        if (_trade.allowed.length > 0) {
+            for (uint256 i = 0; i < _trade.allowed.length; i++) {
+                if (_trade.allowed[i] == msg.sender) {
+                    break;
+                }
+
+                if (i == _trade.allowed.length - 1) {
+                    revert NotAllowed();
+                }
+            }
+        }
+
         address recovered = ECDSA.recover(
             _hashTypedDataV4(
                 keccak256(
                     abi.encode(
-                        TRADE_TYPE_HASH, _trade.expiration, _hashAssets(_trade.sent), _hashAssets(_trade.received)
+                        TRADE_TYPE_HASH,
+                        _trade.expiration,
+                        abi.encodePacked(_trade.allowed),
+                        _hashAssets(_trade.sent),
+                        _hashAssets(_trade.received)
                     )
                 )
             ),
