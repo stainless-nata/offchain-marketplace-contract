@@ -194,34 +194,34 @@ contract Accept is Test {
         sent[0] = Marketplace.Asset({
             assetType: Marketplace.AssetType.ERC20,
             contractAddress: address(erc20),
-            amountOrTokenId: 0.75 ether
+            value: 0.75 ether
         });
         sent[1] = Marketplace.Asset({
             assetType: Marketplace.AssetType.ERC721,
             contractAddress: address(erc721),
-            amountOrTokenId: 1
+            value: 1
         });
         sent[2] = Marketplace.Asset({
             assetType: Marketplace.AssetType.ITEM,
             contractAddress: address(collection),
-            amountOrTokenId: 1
+            value: 1
         });
 
         Marketplace.Asset[] memory received = new Marketplace.Asset[](3);
         received[0] = Marketplace.Asset({
             assetType: Marketplace.AssetType.ERC20,
             contractAddress: address(erc20),
-            amountOrTokenId: 0.25 ether
+            value: 0.25 ether
         });
         received[1] = Marketplace.Asset({
             assetType: Marketplace.AssetType.ERC721,
             contractAddress: address(erc721),
-            amountOrTokenId: 2
+            value: 2
         });
         received[2] = Marketplace.Asset({
             assetType: Marketplace.AssetType.ITEM,
             contractAddress: address(collection),
-            amountOrTokenId: 2
+            value: 2
         });
 
         bytes32 digest = MessageHashUtils.toTypedDataHash(
