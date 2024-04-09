@@ -95,7 +95,9 @@ contract Accept is Test {
 
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        Marketplace.Trade memory trade = Marketplace.Trade({
+        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+
+        trades[0] = Marketplace.Trade({
             // The signer address would be correct in this case, but another one is being sent, so the InvalidSigner error should be expected.
             signer: caller,
             expiration: block.timestamp + 1,
@@ -107,7 +109,7 @@ contract Accept is Test {
 
         vm.prank(caller);
         vm.expectRevert(InvalidSigner.selector);
-        mkt.accept(trade);
+        mkt.accept(trades);
     }
 
     function test_Expiration() public {
@@ -132,7 +134,9 @@ contract Accept is Test {
 
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        Marketplace.Trade memory trade = Marketplace.Trade({
+        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+
+        trades[0] = Marketplace.Trade({
             signer: caller,
             // Espiration is set to a past date, so the Expired error should be expected.
             expiration: block.timestamp - 1,
@@ -144,7 +148,7 @@ contract Accept is Test {
 
         vm.prank(caller);
         vm.expectRevert(Expired.selector);
-        mkt.accept(trade);
+        mkt.accept(trades);
     }
 
     function test_NotAllowed() public {
@@ -172,7 +176,9 @@ contract Accept is Test {
 
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        Marketplace.Trade memory trade = Marketplace.Trade({
+        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+
+        trades[0] = Marketplace.Trade({
             signer: caller,
             // Espiration is set to a past date, so the Expired error should be expected.
             expiration: expiration,
@@ -184,7 +190,7 @@ contract Accept is Test {
 
         vm.prank(caller);
         vm.expectRevert(NotAllowed.selector);
-        mkt.accept(trade);
+        mkt.accept(trades);
     }
 
     function test_Success() public {
@@ -196,16 +202,10 @@ contract Accept is Test {
             contractAddress: address(erc20),
             value: 0.75 ether
         });
-        sent[1] = Marketplace.Asset({
-            assetType: Marketplace.AssetType.ERC721,
-            contractAddress: address(erc721),
-            value: 1
-        });
-        sent[2] = Marketplace.Asset({
-            assetType: Marketplace.AssetType.ITEM,
-            contractAddress: address(collection),
-            value: 1
-        });
+        sent[1] =
+            Marketplace.Asset({assetType: Marketplace.AssetType.ERC721, contractAddress: address(erc721), value: 1});
+        sent[2] =
+            Marketplace.Asset({assetType: Marketplace.AssetType.ITEM, contractAddress: address(collection), value: 1});
 
         Marketplace.Asset[] memory received = new Marketplace.Asset[](3);
         received[0] = Marketplace.Asset({
@@ -213,16 +213,10 @@ contract Accept is Test {
             contractAddress: address(erc20),
             value: 0.25 ether
         });
-        received[1] = Marketplace.Asset({
-            assetType: Marketplace.AssetType.ERC721,
-            contractAddress: address(erc721),
-            value: 2
-        });
-        received[2] = Marketplace.Asset({
-            assetType: Marketplace.AssetType.ITEM,
-            contractAddress: address(collection),
-            value: 2
-        });
+        received[1] =
+            Marketplace.Asset({assetType: Marketplace.AssetType.ERC721, contractAddress: address(erc721), value: 2});
+        received[2] =
+            Marketplace.Asset({assetType: Marketplace.AssetType.ITEM, contractAddress: address(collection), value: 2});
 
         bytes32 digest = MessageHashUtils.toTypedDataHash(
             mkt.getDomainSeparator(),
@@ -241,7 +235,9 @@ contract Accept is Test {
 
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        Marketplace.Trade memory trade = Marketplace.Trade({
+        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+
+        trades[0] = Marketplace.Trade({
             signer: signer,
             expiration: expiration,
             allowed: allowed,
@@ -251,7 +247,7 @@ contract Accept is Test {
         });
 
         vm.prank(caller);
-        mkt.accept(trade);
+        mkt.accept(trades);
 
         assertEq(erc20.balanceOf(signer), 0.5 ether);
         assertEq(erc20.balanceOf(caller), 1.5 ether);

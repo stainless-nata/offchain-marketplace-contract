@@ -40,44 +40,48 @@ contract Marketplace is EIP712 {
 
     constructor() EIP712("Marketplace", "0.0.1") {}
 
-    function accept(Trade calldata _trade) external {
-        if (_trade.expiration < block.timestamp) {
-            revert Expired();
-        }
+    function accept(Trade[] calldata _trades) external {
+        for (uint256 i = 0; i < _trades.length; i++) {
+            Trade memory trade = _trades[i];
 
-        if (_trade.allowed.length > 0) {
-            for (uint256 i = 0; i < _trade.allowed.length; i++) {
-                if (_trade.allowed[i] == msg.sender) {
-                    break;
-                }
+            if (trade.expiration < block.timestamp) {
+                revert Expired();
+            }
 
-                if (i == _trade.allowed.length - 1) {
-                    revert NotAllowed();
+            if (trade.allowed.length > 0) {
+                for (uint256 j = 0; i < trade.allowed.length; j++) {
+                    if (trade.allowed[j] == msg.sender) {
+                        break;
+                    }
+
+                    if (j == trade.allowed.length - 1) {
+                        revert NotAllowed();
+                    }
                 }
             }
-        }
 
-        address recovered = ECDSA.recover(
-            _hashTypedDataV4(
-                keccak256(
-                    abi.encode(
-                        TRADE_TYPE_HASH,
-                        _trade.expiration,
-                        abi.encodePacked(_trade.allowed),
-                        _hashAssets(_trade.sent),
-                        _hashAssets(_trade.received)
+            address recovered = ECDSA.recover(
+                _hashTypedDataV4(
+                    keccak256(
+                        abi.encode(
+                            TRADE_TYPE_HASH,
+                            trade.expiration,
+                            abi.encodePacked(trade.allowed),
+                            _hashAssets(trade.sent),
+                            _hashAssets(trade.received)
+                        )
                     )
-                )
-            ),
-            _trade.signature
-        );
+                ),
+                trade.signature
+            );
 
-        if (recovered != _trade.signer) {
-            revert InvalidSigner();
+            if (recovered != trade.signer) {
+                revert InvalidSigner();
+            }
+
+            _transferAssets(trade.sent, trade.signer, msg.sender);
+            _transferAssets(trade.received, msg.sender, trade.signer);
         }
-
-        _transferAssets(_trade.sent, _trade.signer, msg.sender);
-        _transferAssets(_trade.received, msg.sender, _trade.signer);
     }
 
     function _hashAssets(Asset[] memory _assets) internal pure returns (bytes memory) {
