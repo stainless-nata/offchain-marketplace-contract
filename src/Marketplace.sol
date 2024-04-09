@@ -5,13 +5,14 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ICollection} from "./interfaces/ICollection.sol";
 
 error InvalidSigner();
 error Expired();
 error NotAllowed();
 
-contract Marketplace is EIP712 {
+contract Marketplace is EIP712, Ownable {
     // keccak256("Asset(uint8 assetType,address contractAddress,uint256 value)")
     bytes32 internal constant ASSET_TYPE_HASH = 0xb99bebde0a31108e2aed751915f8c3174d744fbda4708f4f545daf7c07fc8937;
     // keccak256("Trade(uint256 expiration,address[] allowed,Asset[] sent, Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 value)")
@@ -38,7 +39,7 @@ contract Marketplace is EIP712 {
         Asset[] received;
     }
 
-    constructor() EIP712("Marketplace", "0.0.1") {}
+    constructor() EIP712("Marketplace", "0.0.1") Ownable(_msgSender()) {}
 
     function accept(Trade[] calldata _trades) external {
         for (uint256 i = 0; i < _trades.length; i++) {
@@ -50,7 +51,7 @@ contract Marketplace is EIP712 {
 
             if (trade.allowed.length > 0) {
                 for (uint256 j = 0; i < trade.allowed.length; j++) {
-                    if (trade.allowed[j] == msg.sender) {
+                    if (trade.allowed[j] == _msgSender()) {
                         break;
                     }
 
@@ -79,8 +80,8 @@ contract Marketplace is EIP712 {
                 revert InvalidSigner();
             }
 
-            _transferAssets(trade.sent, trade.signer, msg.sender);
-            _transferAssets(trade.received, msg.sender, trade.signer);
+            _transferAssets(trade.sent, trade.signer, _msgSender());
+            _transferAssets(trade.received, _msgSender(), trade.signer);
         }
     }
 

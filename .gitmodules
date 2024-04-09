@@ -4,6 +4,3 @@
 [submodule "lib/openzeppelin-contracts"]
 	path = lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "lib/common-contracts"]
-	path = lib/common-contracts
-	url = https://github.com/decentraland/common-contracts
