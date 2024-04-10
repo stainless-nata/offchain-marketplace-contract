@@ -8,10 +8,10 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IComposableERC721} from "./interfaces/IComposableERC721.sol";
 import {ICollection} from "./interfaces/ICollection.sol";
 
-error InvalidSignature();
+error InvalidatedSignature();
+error InvalidSigner();
 error Expired();
 error NotAllowed();
-error UsedSalt();
 error InvalidContractSignatureIndex();
 error InvalidSignerSignatureIndex();
 error TooEarly();
@@ -27,7 +27,7 @@ contract Marketplace is EIP712, Ownable {
 
     uint256 private contractSignatureIndex;
     mapping(address => uint256) private signerSignatureIndex;
-    mapping(address => mapping(bytes32 => bool)) private usedSalts;
+    mapping(bytes32 => bool) private invalidatedSignatures;
 
     enum AssetType {
         ERC20,
@@ -69,6 +69,12 @@ contract Marketplace is EIP712, Ownable {
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
 
+            bytes32 hashedSignature = keccak256(trade.signature);
+
+            if (invalidatedSignatures[hashedSignature]) {
+                revert InvalidatedSignature();
+            }
+
             if (trade.effective != 0 && trade.effective < block.timestamp) {
                 revert TooEarly();
             }
@@ -79,10 +85,6 @@ contract Marketplace is EIP712, Ownable {
 
             if (signerSignatureIndex[trade.signer] != trade.signerSignatureIndex) {
                 revert InvalidSignerSignatureIndex();
-            }
-
-            if (usedSalts[_msgSender()][trade.salt]) {
-                revert UsedSalt();
             }
 
             if (trade.expiration < block.timestamp) {
@@ -121,10 +123,10 @@ contract Marketplace is EIP712, Ownable {
             );
 
             if (recovered != trade.signer) {
-                revert InvalidSignature();
+                revert InvalidSigner();
             }
 
-            usedSalts[_msgSender()][trade.salt] = true;
+            invalidatedSignatures[hashedSignature] = true;
 
             _transferAssets(trade.sent, trade.signer, _msgSender());
             _transferAssets(trade.received, _msgSender(), trade.signer);
