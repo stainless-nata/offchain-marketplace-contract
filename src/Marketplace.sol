@@ -17,6 +17,7 @@ error InvalidSignerSignatureIndex();
 error TooEarly();
 error InvalidFingerprint();
 error SignatureReuse();
+error ERC20TransferFailed();
 
 contract Marketplace is EIP712, Ownable {
     // keccak256("Asset(uint8 assetType,address contractAddress,uint256 value)")
@@ -153,7 +154,11 @@ contract Marketplace is EIP712, Ownable {
 
 
             if (asset.assetType == AssetType.ERC20) {
-                IERC20(asset.contractAddress).transferFrom(_from, _to, asset.value);
+                bool result = IERC20(asset.contractAddress).transferFrom(_from, _to, asset.value);
+
+                if (!result) {
+                    revert ERC20TransferFailed();
+                }
             } else if (asset.assetType == AssetType.ERC721) {
                 IComposableERC721 erc721 = IComposableERC721(asset.contractAddress);
 
