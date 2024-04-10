@@ -94,7 +94,7 @@ contract Marketplace is EIP712, Ownable {
             }
 
             if (trade.allowed.length > 0) {
-                for (uint256 j = 0; i < trade.allowed.length; j++) {
+                for (uint256 j = 0; j < trade.allowed.length; j++) {
                     if (trade.allowed[j] == _msgSender()) {
                         break;
                     }
