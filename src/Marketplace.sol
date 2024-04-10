@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IComposableERC721} from "./interfaces/IComposableERC721.sol";
 import {ICollection} from "./interfaces/ICollection.sol";
 
 error InvalidSignature();
@@ -21,6 +21,8 @@ contract Marketplace is EIP712, Ownable {
     bytes32 internal constant ASSET_TYPE_HASH = 0xb99bebde0a31108e2aed751915f8c3174d744fbda4708f4f545daf7c07fc8937;
     // keccak256("Trade(uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 value)")
     bytes32 internal constant TRADE_TYPE_HASH = 0x1bdec0e51d4e120fdb787292dc72c87dc263335a7a6691d368f4f3bd8bd5df1f;
+    // bytes4(keccak256("verifyFingerprint(uint256,bytes)"))
+    bytes4 private constant InterfaceId_VerifyFingerprint = 0x8f9f4b63;
 
     uint256 private contractSignatureIndex;
     mapping(address => uint256) private signerSignatureIndex;
@@ -36,6 +38,7 @@ contract Marketplace is EIP712, Ownable {
         AssetType assetType;
         address contractAddress;
         uint256 value;
+        bytes32 fingerprint;
     }
 
     struct Trade {
@@ -131,7 +134,9 @@ contract Marketplace is EIP712, Ownable {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
-            hashes[i] = keccak256(abi.encode(ASSET_TYPE_HASH, _assets[i].contractAddress, _assets[i].value));
+            Asset memory asset = _assets[i];
+
+            hashes[i] = keccak256(abi.encode(ASSET_TYPE_HASH, asset.contractAddress, asset.value));
         }
 
         return hashes;
@@ -139,18 +144,30 @@ contract Marketplace is EIP712, Ownable {
 
     function _transferAssets(Asset[] memory _assets, address _from, address _to) internal {
         for (uint256 i = 0; i < _assets.length; i++) {
-            if (_assets[i].assetType == AssetType.ERC20) {
-                IERC20(_assets[i].contractAddress).transferFrom(_from, _to, _assets[i].value);
-            } else if (_assets[i].assetType == AssetType.ERC721) {
-                IERC721(_assets[i].contractAddress).safeTransferFrom(_from, _to, _assets[i].value);
+            Asset memory asset = _assets[i];
+
+
+            if (asset.assetType == AssetType.ERC20) {
+                IERC20(asset.contractAddress).transferFrom(_from, _to, asset.value);
+            } else if (asset.assetType == AssetType.ERC721) {
+                IComposableERC721 erc721 = IComposableERC721(asset.contractAddress);
+
+                if (
+                    erc721.supportsInterface(InterfaceId_VerifyFingerprint)
+                        && !erc721.verifyFingerprint(asset.value, abi.encode(asset.fingerprint))
+                ) {
+                    revert InvalidSignature();
+                }
+
+                erc721.safeTransferFrom(_from, _to, asset.value);
             } else {
                 address[] memory beneficiaries = new address[](1);
                 beneficiaries[0] = _to;
 
                 uint256[] memory itemIds = new uint256[](1);
-                itemIds[0] = _assets[i].value;
+                itemIds[0] = asset.value;
 
-                ICollection(_assets[i].contractAddress).issueTokens(beneficiaries, itemIds);
+                ICollection(asset.contractAddress).issueTokens(beneficiaries, itemIds);
             }
         }
     }
