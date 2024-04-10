@@ -15,6 +15,7 @@ error UsedSalt();
 error InvalidContractSignatureIndex();
 error InvalidSignerSignatureIndex();
 error TooEarly();
+error InvalidFingerprint();
 
 contract Marketplace is EIP712, Ownable {
     // keccak256("Asset(uint8 assetType,address contractAddress,uint256 value)")
@@ -22,7 +23,7 @@ contract Marketplace is EIP712, Ownable {
     // keccak256("Trade(uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 value)")
     bytes32 internal constant TRADE_TYPE_HASH = 0x1bdec0e51d4e120fdb787292dc72c87dc263335a7a6691d368f4f3bd8bd5df1f;
     // bytes4(keccak256("verifyFingerprint(uint256,bytes)"))
-    bytes4 private constant InterfaceId_VerifyFingerprint = 0x8f9f4b63;
+    bytes4 private constant VERIFY_FINGERPRINT_SELECTOR = 0x8f9f4b63;
 
     uint256 private contractSignatureIndex;
     mapping(address => uint256) private signerSignatureIndex;
@@ -153,10 +154,10 @@ contract Marketplace is EIP712, Ownable {
                 IComposableERC721 erc721 = IComposableERC721(asset.contractAddress);
 
                 if (
-                    erc721.supportsInterface(InterfaceId_VerifyFingerprint)
+                    erc721.supportsInterface(VERIFY_FINGERPRINT_SELECTOR)
                         && !erc721.verifyFingerprint(asset.value, abi.encode(asset.fingerprint))
                 ) {
-                    revert InvalidSignature();
+                    revert InvalidFingerprint();
                 }
 
                 erc721.safeTransferFrom(_from, _to, asset.value);
