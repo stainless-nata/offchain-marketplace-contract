@@ -20,9 +20,9 @@ error SignatureReuse();
 
 contract Marketplace is EIP712, Ownable {
     // keccak256("Asset(uint8 assetType,address contractAddress,uint256 value)")
-    bytes32 internal constant ASSET_TYPE_HASH = 0xb99bebde0a31108e2aed751915f8c3174d744fbda4708f4f545daf7c07fc8937;
+    bytes32 private constant ASSET_TYPE_HASH = 0xb99bebde0a31108e2aed751915f8c3174d744fbda4708f4f545daf7c07fc8937;
     // keccak256("Trade(uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 value)")
-    bytes32 internal constant TRADE_TYPE_HASH = 0x1bdec0e51d4e120fdb787292dc72c87dc263335a7a6691d368f4f3bd8bd5df1f;
+    bytes32 private constant TRADE_TYPE_HASH = 0x1bdec0e51d4e120fdb787292dc72c87dc263335a7a6691d368f4f3bd8bd5df1f;
     // bytes4(keccak256("verifyFingerprint(uint256,bytes)"))
     bytes4 private constant VERIFY_FINGERPRINT_SELECTOR = 0x8f9f4b63;
 
@@ -135,7 +135,7 @@ contract Marketplace is EIP712, Ownable {
         }
     }
 
-    function _hashAssets(Asset[] memory _assets) internal pure returns (bytes32[] memory) {
+    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32[] memory) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
@@ -147,7 +147,7 @@ contract Marketplace is EIP712, Ownable {
         return hashes;
     }
 
-    function _transferAssets(Asset[] memory _assets, address _from, address _to) internal {
+    function _transferAssets(Asset[] memory _assets, address _from, address _to) private {
         for (uint256 i = 0; i < _assets.length; i++) {
             Asset memory asset = _assets[i];
 
