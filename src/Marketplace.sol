@@ -108,8 +108,8 @@ contract Marketplace is EIP712, Ownable {
                             trade.contractSignatureIndex,
                             trade.signerSignatureIndex,
                             abi.encodePacked(trade.allowed),
-                            _hashAssets(trade.sent),
-                            _hashAssets(trade.received)
+                            abi.encodePacked(_hashAssets(trade.sent)),
+                            abi.encodePacked(_hashAssets(trade.received))
                         )
                     )
                 ),
@@ -127,14 +127,14 @@ contract Marketplace is EIP712, Ownable {
         }
     }
 
-    function _hashAssets(Asset[] memory _assets) internal pure returns (bytes memory) {
+    function _hashAssets(Asset[] memory _assets) internal pure returns (bytes32[] memory) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
             hashes[i] = keccak256(abi.encode(ASSET_TYPE_HASH, _assets[i].contractAddress, _assets[i].value));
         }
 
-        return abi.encodePacked(hashes);
+        return hashes;
     }
 
     function _transferAssets(Asset[] memory _assets, address _from, address _to) internal {
