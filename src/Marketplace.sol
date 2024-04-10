@@ -8,15 +8,23 @@ import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ICollection} from "./interfaces/ICollection.sol";
 
-error InvalidSigner();
+error InvalidSignature();
 error Expired();
 error NotAllowed();
+error UsedSalt();
+error InvalidContractSignatureIndex();
+error InvalidSignerSignatureIndex();
+error TooEarly();
 
 contract Marketplace is EIP712, Ownable {
     // keccak256("Asset(uint8 assetType,address contractAddress,uint256 value)")
     bytes32 internal constant ASSET_TYPE_HASH = 0xb99bebde0a31108e2aed751915f8c3174d744fbda4708f4f545daf7c07fc8937;
-    // keccak256("Trade(uint256 expiration,address[] allowed,Asset[] sent, Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 value)")
-    bytes32 internal constant TRADE_TYPE_HASH = 0x3ef7c41fc4fc09bac98f8a1de3e526cef4c2cace932ad41edf7e40e5201c0915;
+    // keccak256("Trade(uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 value)")
+    bytes32 internal constant TRADE_TYPE_HASH = 0x1bdec0e51d4e120fdb787292dc72c87dc263335a7a6691d368f4f3bd8bd5df1f;
+
+    uint256 private contractSignatureIndex;
+    mapping(address => uint256) private signerSignatureIndex;
+    mapping(address => mapping(bytes32 => bool)) private usedSalts;
 
     enum AssetType {
         ERC20,
@@ -32,18 +40,46 @@ contract Marketplace is EIP712, Ownable {
 
     struct Trade {
         address signer;
-        uint256 expiration;
-        address[] allowed;
         bytes signature;
+        uint256 expiration;
+        uint256 effective;
+        bytes32 salt;
+        uint256 contractSignatureIndex;
+        uint256 signerSignatureIndex;
+        address[] allowed;
         Asset[] sent;
         Asset[] received;
     }
 
     constructor() EIP712("Marketplace", "0.0.1") Ownable(_msgSender()) {}
 
+    function increaseContractSignatureIndex() external onlyOwner {
+        contractSignatureIndex++;
+    }
+
+    function increaseSignerSignatureIndex() external {
+        signerSignatureIndex[_msgSender()]++;
+    }
+
     function accept(Trade[] calldata _trades) external {
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
+
+            if (trade.effective != 0 && trade.effective < block.timestamp) {
+                revert TooEarly();
+            }
+
+            if (contractSignatureIndex != trade.contractSignatureIndex) {
+                revert InvalidContractSignatureIndex();
+            }
+
+            if (signerSignatureIndex[trade.signer] != trade.signerSignatureIndex) {
+                revert InvalidSignerSignatureIndex();
+            }
+
+            if (usedSalts[_msgSender()][trade.salt]) {
+                revert UsedSalt();
+            }
 
             if (trade.expiration < block.timestamp) {
                 revert Expired();
@@ -67,6 +103,10 @@ contract Marketplace is EIP712, Ownable {
                         abi.encode(
                             TRADE_TYPE_HASH,
                             trade.expiration,
+                            trade.effective,
+                            trade.salt,
+                            trade.contractSignatureIndex,
+                            trade.signerSignatureIndex,
                             abi.encodePacked(trade.allowed),
                             _hashAssets(trade.sent),
                             _hashAssets(trade.received)
@@ -77,8 +117,10 @@ contract Marketplace is EIP712, Ownable {
             );
 
             if (recovered != trade.signer) {
-                revert InvalidSigner();
+                revert InvalidSignature();
             }
+
+            usedSalts[_msgSender()][trade.salt] = true;
 
             _transferAssets(trade.sent, trade.signer, _msgSender());
             _transferAssets(trade.received, _msgSender(), trade.signer);
