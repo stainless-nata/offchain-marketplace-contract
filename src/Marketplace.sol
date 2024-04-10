@@ -16,6 +16,7 @@ error InvalidContractSignatureIndex();
 error InvalidSignerSignatureIndex();
 error TooEarly();
 error InvalidFingerprint();
+error SignatureReuse();
 
 contract Marketplace is EIP712, Ownable {
     // keccak256("Asset(uint8 assetType,address contractAddress,uint256 value)")
@@ -27,7 +28,7 @@ contract Marketplace is EIP712, Ownable {
 
     uint256 private contractSignatureIndex;
     mapping(address => uint256) private signerSignatureIndex;
-    mapping(bytes32 => bool) private invalidatedSignatures;
+    mapping(bytes32 => uint256) private signatureUses;
 
     enum AssetType {
         ERC20,
@@ -45,6 +46,7 @@ contract Marketplace is EIP712, Ownable {
     struct Trade {
         address signer;
         bytes signature;
+        uint256 uses;
         uint256 expiration;
         uint256 effective;
         bytes32 salt;
@@ -71,8 +73,8 @@ contract Marketplace is EIP712, Ownable {
 
             bytes32 hashedSignature = keccak256(trade.signature);
 
-            if (invalidatedSignatures[hashedSignature]) {
-                revert InvalidatedSignature();
+            if (signatureUses[hashedSignature] >= trade.uses) {
+                revert SignatureReuse();
             }
 
             if (trade.effective != 0 && trade.effective < block.timestamp) {
@@ -126,7 +128,7 @@ contract Marketplace is EIP712, Ownable {
                 revert InvalidSigner();
             }
 
-            invalidatedSignatures[hashedSignature] = true;
+            signatureUses[hashedSignature]++;
 
             _transferAssets(trade.sent, trade.signer, _msgSender());
             _transferAssets(trade.received, _msgSender(), trade.signer);
