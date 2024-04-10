@@ -8,7 +8,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IComposableERC721} from "./interfaces/IComposableERC721.sol";
 import {ICollection} from "./interfaces/ICollection.sol";
 
-error InvalidatedSignature();
 error InvalidSigner();
 error Expired();
 error NotAllowed();
@@ -152,33 +151,44 @@ contract Marketplace is EIP712, Ownable {
         for (uint256 i = 0; i < _assets.length; i++) {
             Asset memory asset = _assets[i];
 
-
             if (asset.assetType == AssetType.ERC20) {
-                bool result = IERC20(asset.contractAddress).transferFrom(_from, _to, asset.value);
-
-                if (!result) {
-                    revert ERC20TransferFailed();
-                }
+                _transferERC20(asset, _from, _to);
             } else if (asset.assetType == AssetType.ERC721) {
-                IComposableERC721 erc721 = IComposableERC721(asset.contractAddress);
-
-                if (
-                    erc721.supportsInterface(VERIFY_FINGERPRINT_SELECTOR)
-                        && !erc721.verifyFingerprint(asset.value, abi.encode(asset.fingerprint))
-                ) {
-                    revert InvalidFingerprint();
-                }
-
-                erc721.safeTransferFrom(_from, _to, asset.value);
+                _transferERC721(asset, _from, _to);
             } else {
-                address[] memory beneficiaries = new address[](1);
-                beneficiaries[0] = _to;
-
-                uint256[] memory itemIds = new uint256[](1);
-                itemIds[0] = asset.value;
-
-                ICollection(asset.contractAddress).issueTokens(beneficiaries, itemIds);
+                _transferItem(asset, _to);
             }
         }
+    }
+
+    function _transferERC20(Asset memory _asset, address _from, address _to) private {
+        bool result = IERC20(_asset.contractAddress).transferFrom(_from, _to, _asset.value);
+
+        if (!result) {
+            revert ERC20TransferFailed();
+        }
+    }
+
+    function _transferERC721(Asset memory _asset, address _from, address _to) private {
+        IComposableERC721 erc721 = IComposableERC721(_asset.contractAddress);
+
+        if (
+            erc721.supportsInterface(VERIFY_FINGERPRINT_SELECTOR)
+                && !erc721.verifyFingerprint(_asset.value, abi.encode(_asset.fingerprint))
+        ) {
+            revert InvalidFingerprint();
+        }
+
+        erc721.safeTransferFrom(_from, _to, _asset.value);
+    }
+
+    function _transferItem(Asset memory _asset, address _to) private {
+        address[] memory beneficiaries = new address[](1);
+        beneficiaries[0] = _to;
+
+        uint256[] memory itemIds = new uint256[](1);
+        itemIds[0] = _asset.value;
+
+        ICollection(_asset.contractAddress).issueTokens(beneficiaries, itemIds);
     }
 }
