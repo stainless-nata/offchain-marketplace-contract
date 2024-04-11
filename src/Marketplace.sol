@@ -142,5 +142,5 @@ abstract contract Marketplace is EIP712, Ownable {
         }
     }
 
-    function _transferAsset(Asset memory _asset, address _from, address _to) internal virtual {}
+    function _transferAsset(Asset memory _asset, address _from, address _to) internal virtual;
 }
