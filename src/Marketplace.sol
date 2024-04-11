@@ -7,6 +7,7 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol
 import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Pausable} from "lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 error InvalidSigner();
 error Expired();
@@ -15,7 +16,7 @@ error InvalidContractSignatureIndex();
 error InvalidSignerSignatureIndex();
 error SignatureReuse();
 
-abstract contract Marketplace is EIP712, Ownable, Pausable {
+abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// EIP712 Type hash for the Asset struct.
     bytes32 private constant ASSET_TYPE_HASH =
         keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra)");
@@ -107,7 +108,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable {
     /// Main function of the contract.
     /// Accepts an array of trades and executes them.
     /// @param _trades - The trades to be executed.
-    function accept(Trade[] calldata _trades) external whenNotPaused {
+    function accept(Trade[] calldata _trades) external whenNotPaused nonReentrant {
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
 
