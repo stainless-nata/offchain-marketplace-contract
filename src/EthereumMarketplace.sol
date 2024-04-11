@@ -2,9 +2,11 @@
 pragma solidity ^0.8.20;
 
 import {Marketplace} from "./Marketplace.sol";
-import {ERC20Transfer} from "./transferables/ERC20Transfer.sol";
-import {ERC721Transfer} from "./transferables/ERC721Transfer.sol";
-import {ComposableERC721Transfer} from "./transferables/ComposableERC721Transfer.sol";
+import {ERC20Transfer} from "./transfers/ERC20Transfer.sol";
+import {ERC721Transfer} from "./transfers/ERC721Transfer.sol";
+import {ComposableERC721Transfer} from "./transfers/ComposableERC721Transfer.sol";
+
+error UnsupportedAssetType(uint256 _assetType);
 
 contract EthereumMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, ComposableERC721Transfer {
     uint256 public constant ERC20_ID = 0;
@@ -16,8 +18,10 @@ contract EthereumMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, Comp
             _transferERC20(_asset.contractAddress, _from, _to, _asset.value);
         } else if (_asset.assetType == ERC721_ID) {
             _transferERC721(_asset.contractAddress, _from, _to, _asset.value, _asset.extra);
-        } else {
+        } else if (_asset.assetType == COMPOSABLE_ERC721_ID) {
             _transferComposableERC721(_asset.contractAddress, _from, _to, _asset.value, _asset.extra);
+        } else {
+            revert UnsupportedAssetType(_asset.assetType);
         }
     }
 }
