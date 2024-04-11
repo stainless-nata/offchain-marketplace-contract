@@ -6,7 +6,7 @@ import {ERC20Transfer} from "./transferables/ERC20Transfer.sol";
 import {ERC721Transfer} from "./transferables/ERC721Transfer.sol";
 import {ComposableERC721Transfer} from "./transferables/ComposableERC721Transfer.sol";
 
-contract EthereumDecentralandMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, ComposableERC721Transfer {
+contract EthereumMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, ComposableERC721Transfer {
     uint256 public constant ERC20_ID = 0;
     uint256 public constant ERC721_ID = 1;
     uint256 public constant COMPOSABLE_ERC721_ID = 2;

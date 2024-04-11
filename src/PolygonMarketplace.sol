@@ -6,7 +6,7 @@ import {ERC20Transfer} from "./transferables/ERC20Transfer.sol";
 import {ERC721Transfer} from "./transferables/ERC721Transfer.sol";
 import {CollectionItemTransfer} from "./transferables/CollectionItemTransfer.sol";
 
-contract PolygonDecentralandMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, CollectionItemTransfer {
+contract PolygonMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, CollectionItemTransfer {
     uint256 public constant ERC20_ID = 0;
     uint256 public constant ERC721_ID = 1;
     uint256 public constant COLLECTION_ITEM_ID = 2;
