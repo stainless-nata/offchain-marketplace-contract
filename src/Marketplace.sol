@@ -6,6 +6,7 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Pausable} from "lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 
 error InvalidSigner();
 error Expired();
@@ -14,7 +15,7 @@ error InvalidContractSignatureIndex();
 error InvalidSignerSignatureIndex();
 error SignatureReuse();
 
-abstract contract Marketplace is EIP712, Ownable {
+abstract contract Marketplace is EIP712, Ownable, Pausable {
     /// EIP712 Type hash for the Asset struct.
     bytes32 private constant ASSET_TYPE_HASH =
         keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra)");
@@ -79,9 +80,20 @@ abstract contract Marketplace is EIP712, Ownable {
     /// @param _owner - The owner of the contract.
     constructor(address _owner) EIP712("Marketplace", "0.0.1") Ownable(_owner) {}
 
+    /// Pauses the contract.
+    /// The contract will not accept any trades while paused.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// Unpauses the contract.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     /// Increases the contractSignatureIndex by 1.
     /// Can only be called by the owner of the contract.
-    /// Increasing it is a way to invalidate all trades signed with the previous value. 
+    /// Increasing it is a way to invalidate all trades signed with the previous value.
     function increaseContractSignatureIndex() external onlyOwner {
         contractSignatureIndex++;
     }
@@ -95,7 +107,7 @@ abstract contract Marketplace is EIP712, Ownable {
     /// Main function of the contract.
     /// Accepts an array of trades and executes them.
     /// @param _trades - The trades to be executed.
-    function accept(Trade[] calldata _trades) external {
+    function accept(Trade[] calldata _trades) external whenNotPaused {
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
 
