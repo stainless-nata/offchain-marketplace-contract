@@ -12,76 +12,120 @@ error Expired();
 error NotAllowed();
 error InvalidContractSignatureIndex();
 error InvalidSignerSignatureIndex();
-error TooEarly();
 error SignatureReuse();
 
 abstract contract Marketplace is EIP712, Ownable {
-    // keccak256("Asset(uint8 assetType,address contractAddress,uint256 value)")
-    bytes32 private constant ASSET_TYPE_HASH = 0xb99bebde0a31108e2aed751915f8c3174d744fbda4708f4f545daf7c07fc8937;
-    // keccak256("Trade(uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 value)")
-    bytes32 private constant TRADE_TYPE_HASH = 0x1bdec0e51d4e120fdb787292dc72c87dc263335a7a6691d368f4f3bd8bd5df1f;
+    /// EIP712 Type hash for the Asset struct.
+    bytes32 private constant ASSET_TYPE_HASH =
+        keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra)");
 
+    /// EIP712 Type hash for the Trade struct.
+    bytes32 private constant TRADE_TYPE_HASH = keccak256(
+        "Trade(uint256 uses,uint256 expiration,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra)"
+    );
+
+    /// Number used as part of the trade signature.
+    /// Can be updated by the owner to invalidate all trades signed with it.
     uint256 private contractSignatureIndex;
+
+    /// Number used as part of the trade signature,
+    /// Can be updated by the signer to invalidate all trades signed with it.
     mapping(address => uint256) private signerSignatureIndex;
+
+    /// Number of times a signature has been used.
+    /// Depends on the trade how many times a signature can be used.
     mapping(bytes32 => uint256) private signatureUses;
 
+    /// Asset struct representing an asset to be traded.
     struct Asset {
+        /// The type of asset to be traded, e.g. ERC20, ERC721, etc.
+        /// Should be handled accordingly on the overriden _transferAsset function.
         uint256 assetType;
+        /// The address of the contract of the asset to be traded.
         address contractAddress;
+        /// Depending on the asset to be traded, it could be the amount for ERC20s or the tokenId for ERC721s.
         uint256 value;
+        /// Any extra data that might be useful for the asset to be traded.
+        /// For example, the data for ERC721 safe transfers or the fingerprint for Composable ERC721s.
         bytes extra;
     }
 
+    /// Trade struct representing a trade between two parties.
     struct Trade {
+        /// The address of the signer of the trade.
         address signer;
+        /// The signature of the trade. Created by aforementioned signer.
         bytes signature;
+        /// How many times the trade can be executed.
+        /// 0 means infinite uses. 1 or more means that the trade can only be executed that many times.
         uint256 uses;
+        /// The timestamp the trade cannot be accepted anymore.
         uint256 expiration;
-        uint256 effective;
+        /// A random value to make the trade signature unique even for Trades with the same values.
         bytes32 salt;
+        /// Should be the current contractSignatureIndex to be a valid trade.
         uint256 contractSignatureIndex;
+        /// Should be the current signerSignatureIndex of the signer to be a valid trade.
         uint256 signerSignatureIndex;
+        /// The addresses allowed to accept the trade.
+        /// If empty, any address can accept the trade.
         address[] allowed;
+        /// The assets to be sent by the signer.
         Asset[] sent;
+        /// The assets to be received by the signer.
         Asset[] received;
     }
 
-    constructor() EIP712("Marketplace", "0.0.1") Ownable(_msgSender()) {}
+    /// @param _owner - The owner of the contract.
+    constructor(address _owner) EIP712("Marketplace", "0.0.1") Ownable(_owner) {}
 
+    /// Increases the contractSignatureIndex by 1.
+    /// Can only be called by the owner of the contract.
+    /// Increasing it is a way to invalidate all trades signed with the previous value. 
     function increaseContractSignatureIndex() external onlyOwner {
         contractSignatureIndex++;
     }
 
+    /// Increases the signerSignatureIndex of the caller by 1.
+    /// Increasing it is a way to invalidate all trades signed by the caller with the previous value.
     function increaseSignerSignatureIndex() external {
         signerSignatureIndex[_msgSender()]++;
     }
 
+    /// Main function of the contract.
+    /// Accepts an array of trades and executes them.
+    /// @param _trades - The trades to be executed.
     function accept(Trade[] calldata _trades) external {
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
 
+            /// Given that the signature needs to be stored in order to verify how many times it has been used,
+            /// it is more efficient to hash it and store the hash than store the whole signature.
             bytes32 hashedSignature = keccak256(trade.signature);
 
-            if (signatureUses[hashedSignature] >= trade.uses) {
+            /// If the trade comes with a defined amount of uses higher than 0.
+            /// Will fail if the signature has been used more times than allowed.
+            if (trade.uses > 0 && signatureUses[hashedSignature] >= trade.uses) {
                 revert SignatureReuse();
             }
 
-            if (trade.effective != 0 && trade.effective < block.timestamp) {
-                revert TooEarly();
-            }
-
+            /// Fails if the contractSignatureIndex of the trade is different from the current contractSignatureIndex.
             if (contractSignatureIndex != trade.contractSignatureIndex) {
                 revert InvalidContractSignatureIndex();
             }
 
+            /// Fails if the signerSignatureIndex of the trade is different from the current signerSignatureIndex of the signer.
             if (signerSignatureIndex[trade.signer] != trade.signerSignatureIndex) {
                 revert InvalidSignerSignatureIndex();
             }
 
+            /// Fails if the trade has expired.
             if (trade.expiration < block.timestamp) {
                 revert Expired();
             }
 
+            /// If a list of allowed addresses is provided with at least 1 address.
+            /// Fails if the caller is not in the list of allowed addresses.
             if (trade.allowed.length > 0) {
                 for (uint256 j = 0; j < trade.allowed.length; j++) {
                     if (trade.allowed[j] == _msgSender()) {
@@ -94,13 +138,15 @@ abstract contract Marketplace is EIP712, Ownable {
                 }
             }
 
+            /// Recovers the address of the signer of the trade.
+            /// Used to verify that the trade values are what the signer has agreed upon.
             address recovered = ECDSA.recover(
                 _hashTypedDataV4(
                     keccak256(
                         abi.encode(
                             TRADE_TYPE_HASH,
+                            trade.uses,
                             trade.expiration,
-                            trade.effective,
                             trade.salt,
                             trade.contractSignatureIndex,
                             trade.signerSignatureIndex,
@@ -113,17 +159,24 @@ abstract contract Marketplace is EIP712, Ownable {
                 trade.signature
             );
 
+            /// Fails if the recovered address is different from the signer of the trade.
             if (recovered != trade.signer) {
                 revert InvalidSigner();
             }
 
+            /// Increases the amount of times the signature has been used.
             signatureUses[hashedSignature]++;
 
+            /// Transfers the assets from the signer to the caller.
             _transferAssets(trade.sent, trade.signer, _msgSender());
+
+            /// Transfers the assets from the caller to the signer.
             _transferAssets(trade.received, _msgSender(), trade.signer);
         }
     }
 
+    /// @param _assets - The assets to be hashed.
+    /// @return hashes - The hashes of the provided assets.
     function _hashAssets(Asset[] memory _assets) private pure returns (bytes32[] memory) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
@@ -136,11 +189,18 @@ abstract contract Marketplace is EIP712, Ownable {
         return hashes;
     }
 
+    /// @param _assets - The assets to be transferred.
+    /// @param _from - The address of the sender.
+    /// @param _to - The address of the receiver.
     function _transferAssets(Asset[] memory _assets, address _from, address _to) private {
         for (uint256 i = 0; i < _assets.length; i++) {
             _transferAsset(_assets[i], _from, _to);
         }
     }
 
+    /// This function should be overriden to handle the transfer of the provided asset.
+    /// @param _asset - The asset to be transferred.
+    /// @param _from - The address of the sender.
+    /// @param _to - The address of the receiver.
     function _transferAsset(Asset memory _asset, address _from, address _to) internal virtual;
 }

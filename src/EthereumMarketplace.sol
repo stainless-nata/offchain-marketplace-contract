@@ -13,6 +13,8 @@ contract EthereumMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, Comp
     uint256 public constant ERC721_ID = 1;
     uint256 public constant COMPOSABLE_ERC721_ID = 2;
 
+    constructor(address _owner) Marketplace(_owner) {}
+
     function _transferAsset(Asset memory _asset, address _from, address _to) internal override {
         if (_asset.assetType == ERC20_ID) {
             _transferERC20(_asset.contractAddress, _from, _to, _asset.value);
