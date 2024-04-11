@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IComposableERC721} from "./interfaces/IComposableERC721.sol";
-import {ICollection} from "./interfaces/ICollection.sol";
+import {EIP712} from "lib/openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
+import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 error InvalidSigner();
 error Expired();
@@ -14,33 +13,23 @@ error NotAllowed();
 error InvalidContractSignatureIndex();
 error InvalidSignerSignatureIndex();
 error TooEarly();
-error InvalidFingerprint();
 error SignatureReuse();
-error ERC20TransferFailed();
 
-contract Marketplace is EIP712, Ownable {
+abstract contract Marketplace is EIP712, Ownable {
     // keccak256("Asset(uint8 assetType,address contractAddress,uint256 value)")
     bytes32 private constant ASSET_TYPE_HASH = 0xb99bebde0a31108e2aed751915f8c3174d744fbda4708f4f545daf7c07fc8937;
     // keccak256("Trade(uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,Asset[] received)Asset(uint8 assetType,address contractAddress,uint256 value)")
     bytes32 private constant TRADE_TYPE_HASH = 0x1bdec0e51d4e120fdb787292dc72c87dc263335a7a6691d368f4f3bd8bd5df1f;
-    // bytes4(keccak256("verifyFingerprint(uint256,bytes)"))
-    bytes4 private constant VERIFY_FINGERPRINT_SELECTOR = 0x8f9f4b63;
 
     uint256 private contractSignatureIndex;
     mapping(address => uint256) private signerSignatureIndex;
     mapping(bytes32 => uint256) private signatureUses;
 
-    enum AssetType {
-        ERC20,
-        ERC721,
-        ITEM
-    }
-
     struct Asset {
-        AssetType assetType;
+        uint256 assetType;
         address contractAddress;
         uint256 value;
-        bytes32 fingerprint;
+        bytes extra;
     }
 
     struct Trade {
@@ -149,46 +138,9 @@ contract Marketplace is EIP712, Ownable {
 
     function _transferAssets(Asset[] memory _assets, address _from, address _to) private {
         for (uint256 i = 0; i < _assets.length; i++) {
-            Asset memory asset = _assets[i];
-
-            if (asset.assetType == AssetType.ERC20) {
-                _transferERC20(asset, _from, _to);
-            } else if (asset.assetType == AssetType.ERC721) {
-                _transferERC721(asset, _from, _to);
-            } else {
-                _transferItem(asset, _to);
-            }
+            _transferAsset(_assets[i], _from, _to);
         }
     }
 
-    function _transferERC20(Asset memory _asset, address _from, address _to) private {
-        bool result = IERC20(_asset.contractAddress).transferFrom(_from, _to, _asset.value);
-
-        if (!result) {
-            revert ERC20TransferFailed();
-        }
-    }
-
-    function _transferERC721(Asset memory _asset, address _from, address _to) private {
-        IComposableERC721 erc721 = IComposableERC721(_asset.contractAddress);
-
-        if (
-            erc721.supportsInterface(VERIFY_FINGERPRINT_SELECTOR)
-                && !erc721.verifyFingerprint(_asset.value, abi.encode(_asset.fingerprint))
-        ) {
-            revert InvalidFingerprint();
-        }
-
-        erc721.safeTransferFrom(_from, _to, _asset.value);
-    }
-
-    function _transferItem(Asset memory _asset, address _to) private {
-        address[] memory beneficiaries = new address[](1);
-        beneficiaries[0] = _to;
-
-        uint256[] memory itemIds = new uint256[](1);
-        itemIds[0] = _asset.value;
-
-        ICollection(_asset.contractAddress).issueTokens(beneficiaries, itemIds);
-    }
+    function _transferAsset(Asset memory _asset, address _from, address _to) internal virtual {}
 }
