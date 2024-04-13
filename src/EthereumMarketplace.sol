@@ -15,13 +15,13 @@ contract EthereumMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, Comp
 
     constructor(address _owner) Marketplace(_owner) {}
 
-    function _transferAsset(Asset memory _asset, address _from, address _to) internal override {
+    function _transferAsset(Asset memory _asset, address _from) internal override {
         if (_asset.assetType == ERC20_ID) {
-            _transferERC20(_asset.contractAddress, _from, _to, _asset.value);
+            _transferERC20(_asset, _from);
         } else if (_asset.assetType == ERC721_ID) {
-            _transferERC721(_asset.contractAddress, _from, _to, _asset.value, _asset.extra);
+            _transferERC721(_asset, _from);
         } else if (_asset.assetType == COMPOSABLE_ERC721_ID) {
-            _transferComposableERC721(_asset.contractAddress, _from, _to, _asset.value, _asset.extra);
+            _transferComposableERC721(_asset, _from);
         } else {
             revert UnsupportedAssetType(_asset.assetType);
         }

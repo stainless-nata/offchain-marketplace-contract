@@ -2,21 +2,16 @@
 pragma solidity ^0.8.20;
 
 import {IERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
+import {Marketplace} from "../Marketplace.sol";
 
 abstract contract ERC721Transfer {
-    function _transferERC721(
-        address _contractAddress,
-        address _from,
-        address _to,
-        uint256 _tokenId,
-        bytes memory _data
-    ) internal {
-        IERC721 erc721 = IERC721(_contractAddress);
+    function _transferERC721(Marketplace.Asset memory _asset, address _from) internal {
+        IERC721 erc721 = IERC721(_asset.contractAddress);
 
-        if (_data.length > 0) {
-            erc721.safeTransferFrom(_from, _to, _tokenId, _data);
+        if (_asset.extra.length > 0) {
+            erc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value, _asset.extra);
         } else {
-            erc721.safeTransferFrom(_from, _to, _tokenId);
+            erc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value);
         }
     }
 }

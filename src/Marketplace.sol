@@ -17,14 +17,18 @@ error InvalidSignerSignatureIndex();
 error SignatureReuse();
 
 abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
+    /// EIP712 Type hash for the Asset struct without the beneficiary.
+    /// keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
+    bytes32 private constant ASSET_WO_BENEFICIARY_TYPE_HASH =
+        0x7be57332caf51c5f0f0fa0e7c362534d22d81c0bee1ffac9b573acd336e032bd;
+
     /// EIP712 Type hash for the Asset struct.
-    bytes32 private constant ASSET_TYPE_HASH =
-        keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra)");
+    /// keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)")
+    bytes32 private constant ASSET_TYPE_HASH = 0xe5f9e1ebc316d1bde562c77f47da7dc2cccb903eb04f9b82e29212b96f9e57e1;
 
     /// EIP712 Type hash for the Trade struct.
-    bytes32 private constant TRADE_TYPE_HASH = keccak256(
-        "Trade(uint256 uses,uint256 expiration,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra)"
-    );
+    /// keccak256("Trade(uint256 uses,uint256 expiration,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,AssetWithBeneficiary[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
+    bytes32 private constant TRADE_TYPE_HASH = 0x2cb5b71f5756633db8ac23d6cea72af6b7e0d03bae2b258f89288bb7f045d851;
 
     /// Number used as part of the trade signature.
     /// Can be updated by the owner to invalidate all trades signed with it.
@@ -50,6 +54,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         /// Any extra data that might be useful for the asset to be traded.
         /// For example, the data for ERC721 safe transfers or the fingerprint for Composable ERC721s.
         bytes extra;
+        /// Used by the signer or the caller to determine who will receive the asset.
+        /// If empty, the asset will be sent to the signer or the caller respectively.
+        address beneficiary;
     }
 
     /// Trade struct representing a trade between two parties.
@@ -164,7 +171,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                             trade.contractSignatureIndex,
                             trade.signerSignatureIndex,
                             abi.encodePacked(trade.allowed),
-                            abi.encodePacked(_hashAssets(trade.sent)),
+                            /// The beneficiary of the sent assets are not hashed.
+                            /// This makes it possible to the caller to decide at the time of the trade execution, to define who is going to receive the assets sent by the signer.
+                            abi.encodePacked(_hashAssetsWithoutBeneficiary(trade.sent)),
                             abi.encodePacked(_hashAssets(trade.received))
                         )
                     )
@@ -190,13 +199,35 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
     /// @param _assets - The assets to be hashed.
     /// @return hashes - The hashes of the provided assets.
+    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32[] memory) {
+        bytes32[] memory hashes = new bytes32[](_assets.length);
+
+        for (uint256 i = 0; i < hashes.length; i++) {
+            Asset memory asset = _assets[i];
+
+            hashes[i] = keccak256(
+                abi.encode(
+                    ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, asset.extra
+                )
+            );
+        }
+
+        return hashes;
+    }
+
+    /// @param _assets - The assets to be hashed.
+    /// @return hashes - The hashes of the provided assets.
     function _hashAssets(Asset[] memory _assets) private pure returns (bytes32[] memory) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
             Asset memory asset = _assets[i];
 
-            hashes[i] = keccak256(abi.encode(ASSET_TYPE_HASH, asset.contractAddress, asset.value));
+            hashes[i] = keccak256(
+                abi.encode(
+                    ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, asset.extra, asset.beneficiary
+                )
+            );
         }
 
         return hashes;
@@ -207,13 +238,18 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @param _to - The address of the receiver.
     function _transferAssets(Asset[] memory _assets, address _from, address _to) private {
         for (uint256 i = 0; i < _assets.length; i++) {
-            _transferAsset(_assets[i], _from, _to);
+            Asset memory asset = _assets[i];
+
+            if (asset.beneficiary != address(0)) {
+                asset.beneficiary = _to;
+            }
+
+            _transferAsset(asset, _from);
         }
     }
 
     /// This function should be overriden to handle the transfer of the provided asset.
     /// @param _asset - The asset to be transferred.
     /// @param _from - The address of the sender.
-    /// @param _to - The address of the receiver.
-    function _transferAsset(Asset memory _asset, address _from, address _to) internal virtual;
+    function _transferAsset(Asset memory _asset, address _from) internal virtual;
 }
