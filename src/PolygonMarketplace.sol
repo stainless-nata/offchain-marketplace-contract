@@ -5,10 +5,17 @@ import {Marketplace} from "./Marketplace.sol";
 import {ERC20Transfer} from "./transfers/ERC20Transfer.sol";
 import {ERC721Transfer} from "./transfers/ERC721Transfer.sol";
 import {CollectionItemTransfer} from "./transfers/CollectionItemTransfer.sol";
+import {NativeMetaTransaction} from "./external/NativeMetaTransaction.sol";
 
 error UnsupportedAssetType(uint256 _assetType);
 
-contract PolygonMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, CollectionItemTransfer {
+contract PolygonMarketplace is
+    Marketplace,
+    ERC20Transfer,
+    ERC721Transfer,
+    CollectionItemTransfer,
+    NativeMetaTransaction
+{
     uint256 public constant ERC20_ID = 0;
     uint256 public constant ERC721_ID = 1;
     uint256 public constant COLLECTION_ITEM_ID = 2;
@@ -25,5 +32,9 @@ contract PolygonMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, Colle
         } else {
             revert UnsupportedAssetType(_asset.assetType);
         }
+    }
+
+    function _msgSender() internal view override returns (address sender) {
+        return _getMsgSender();
     }
 }
