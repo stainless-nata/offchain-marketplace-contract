@@ -160,26 +160,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
             /// Recovers the address of the signer of the trade.
             /// Used to verify that the trade values are what the signer has agreed upon.
-            address recovered = ECDSA.recover(
-                _hashTypedDataV4(
-                    keccak256(
-                        abi.encode(
-                            TRADE_TYPE_HASH,
-                            trade.uses,
-                            trade.expiration,
-                            trade.salt,
-                            trade.contractSignatureIndex,
-                            trade.signerSignatureIndex,
-                            abi.encodePacked(trade.allowed),
-                            /// The beneficiary of the sent assets are not hashed.
-                            /// This makes it possible to the caller to decide at the time of the trade execution, to define who is going to receive the assets sent by the signer.
-                            abi.encodePacked(_hashAssetsWithoutBeneficiary(trade.sent)),
-                            abi.encodePacked(_hashAssets(trade.received))
-                        )
-                    )
-                ),
-                trade.signature
-            );
+            address recovered = ECDSA.recover(_hashTypedDataV4(_hashTrade(trade)), trade.signature);
 
             /// Fails if the recovered address is different from the signer of the trade.
             if (recovered != trade.signer) {
@@ -195,6 +176,24 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             /// Transfers the assets from the caller to the signer.
             _transferAssets(trade.received, _msgSender(), trade.signer);
         }
+    }
+
+    function _hashTrade(Trade memory _trade) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                TRADE_TYPE_HASH,
+                _trade.uses,
+                _trade.expiration,
+                _trade.salt,
+                _trade.contractSignatureIndex,
+                _trade.signerSignatureIndex,
+                abi.encodePacked(_trade.allowed),
+                /// The beneficiary of the sent assets are not hashed.
+                /// This makes it possible to the caller to decide at the time of the trade execution, to define who is going to receive the assets sent by the signer.
+                abi.encodePacked(_hashAssetsWithoutBeneficiary(_trade.sent)),
+                abi.encodePacked(_hashAssets(_trade.received))
+            )
+        );
     }
 
     /// @param _assets - The assets to be hashed.
@@ -240,7 +239,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         for (uint256 i = 0; i < _assets.length; i++) {
             Asset memory asset = _assets[i];
 
-            if (asset.beneficiary != address(0)) {
+            if (asset.beneficiary == address(0)) {
                 asset.beneficiary = _to;
             }
 
