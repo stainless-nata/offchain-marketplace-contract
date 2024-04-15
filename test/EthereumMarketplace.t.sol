@@ -23,7 +23,7 @@ contract Accept is Test {
     VmSafe.Wallet owner;
     VmSafe.Wallet signer;
 
-    EthereumMarketplaceHarness mkt;
+    MarketplaceHarness mkt;
 
     function setUp() public {
         uint256 fork = vm.createFork("https://rpc.decentraland.org/mainnet", 19662099);
@@ -32,7 +32,7 @@ contract Accept is Test {
         owner = vm.createWallet("owner");
         signer = vm.createWallet("signer");
 
-        mkt = new EthereumMarketplaceHarness(owner.addr);
+        mkt = new MarketplaceHarness(owner.addr);
     }
 
     function test_SetUpState() public view {
@@ -61,19 +61,19 @@ contract Accept is Test {
             mana.approve(address(mkt), 1 ether);
         }
 
-        EthereumMarketplaceHarness.Trade[] memory trades = new EthereumMarketplaceHarness.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         // Prepare trade.
         {
             trades[0].expiration = block.timestamp;
 
-            trades[0].sent = new EthereumMarketplaceHarness.Asset[](1);
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
 
             trades[0].sent[0].assetType = mkt.ERC20_ID();
             trades[0].sent[0].contractAddress = address(usdt);
             trades[0].sent[0].value = 1000000;
 
-            trades[0].received = new EthereumMarketplaceHarness.Asset[](1);
+            trades[0].received = new MarketplaceHarness.Asset[](1);
 
             trades[0].received[0].assetType = mkt.ERC20_ID();
             trades[0].received[0].contractAddress = address(mana);
