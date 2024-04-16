@@ -294,4 +294,51 @@ contract MarketplaceTest is Test {
         emit Traded();
         marketplace.accept(trades);
     }
+
+    function test_accept_AssetBeneficiaryIsChanged() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+        trades[0].sent = new MarketplaceHarness.Asset[](1);
+
+        trades[0].sent[0].beneficiary = other;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            signer.privateKey,
+            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+        );
+
+        trades[0].sent[0].beneficiary = owner;
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(other);
+        vm.expectEmit(address(marketplace));
+        emit Traded();
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertIfReceivedAssetBeneficiaryIsChanged() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+        trades[0].received = new MarketplaceHarness.Asset[](1);
+
+        trades[0].received[0].beneficiary = other;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            signer.privateKey,
+            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+        );
+
+        trades[0].received[0].beneficiary = owner;
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(other);
+        vm.expectRevert(InvalidSigner.selector);
+        marketplace.accept(trades);
+    }
 }
