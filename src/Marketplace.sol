@@ -188,6 +188,8 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         }
     }
 
+    /// @param _trade - The trade to be hashed.
+    /// @return hash - The hash of the provided trade.
     function _hashTrade(Trade memory _trade) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
