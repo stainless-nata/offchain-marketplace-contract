@@ -7,7 +7,7 @@ import {EthereumMarketplace} from "../src/EthereumMarketplace.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
-contract EthereumMarketplaceHarness is EthereumMarketplace {
+contract MarketplaceHarness is EthereumMarketplace {
     constructor(address _owner) EthereumMarketplace(_owner) {}
 
     function getDomainSeparator() external view returns (bytes32) {
