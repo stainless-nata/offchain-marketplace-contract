@@ -17,7 +17,7 @@ contract MarketplaceHarness is Marketplace {
         return _domainSeparatorV4();
     }
 
-    function hashTrade(Trade memory _trade) external view returns (bytes32) {
+    function hashTrade(Trade memory _trade) external pure returns (bytes32) {
         return _hashTrade(_trade);
     }
 }
@@ -157,6 +157,7 @@ contract MarketplaceTest is Test {
     error NotAllowed();
     error ECDSAInvalidSignatureLength(uint256);
     error InvalidSigner();
+    error SignatureReuse();
 
     // increaseContractSignatureIndex
 
@@ -339,6 +340,28 @@ contract MarketplaceTest is Test {
 
         vm.prank(other);
         vm.expectRevert(InvalidSigner.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertIfSignatureIsResused() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+        trades[0].uses = 1;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            signer.privateKey,
+            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+        );
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        vm.prank(other);
+        vm.expectRevert(SignatureReuse.selector);
         marketplace.accept(trades);
     }
 }
