@@ -136,6 +136,11 @@ contract MarketplaceTest is Test {
     event ContractSignatureIndexIncreased(uint256, address);
     event SignerSignatureIndexIncreased(uint256, address);
 
+    error InvalidContractSignatureIndex();
+    error InvalidSignerSignatureIndex();
+    error Expired();
+    error NotAllowed();
+
     // increaseContractSignatureIndex
 
     function test_increaseContractSignatureIndex_RevertsIfNotOwner() public {
@@ -172,5 +177,58 @@ contract MarketplaceTest is Test {
         emit SignerSignatureIndexIncreased(1, other);
         marketplace.increaseSignerSignatureIndex();
         assertEq(marketplace.signerSignatureIndex(other), 1);
+    }
+
+    // accept
+
+    function test_accept_RevertsIfPaused() public {
+        vm.prank(owner);
+        marketplace.pause();
+
+        MarketplaceHarness.Trade[] memory trades;
+        vm.expectRevert(EnforcedPause.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertsIfInvalidContractSignatureIndex() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].contractSignatureIndex = 1;
+        
+        vm.prank(other);
+        vm.expectRevert(InvalidContractSignatureIndex.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertsIfInvalidSignerSignatureIndex() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].signerSignatureIndex = 1;
+        
+        vm.prank(other);
+        vm.expectRevert(InvalidSignerSignatureIndex.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertsIfExpired() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp - 1;
+        
+        vm.prank(other);
+        vm.expectRevert(Expired.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertsIfNotAllowed() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+        trades[0].allowed = new address[](1);
+        trades[0].allowed[0] = owner;
+        
+        vm.prank(other);
+        vm.expectRevert(NotAllowed.selector);
+        marketplace.accept(trades);
     }
 }
