@@ -149,7 +149,7 @@ contract MarketplaceTest is Test {
 
     event ContractSignatureIndexIncreased(uint256, address);
     event SignerSignatureIndexIncreased(uint256, address);
-    event Traded();
+    event Traded(MarketplaceHarness.Trade);
 
     error InvalidContractSignatureIndex();
     error InvalidSignerSignatureIndex();
@@ -292,7 +292,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit Traded();
+        emit Traded(trades[0]);
         marketplace.accept(trades);
     }
 
@@ -316,7 +316,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(other);
         vm.expectEmit(address(marketplace));
-        emit Traded();
+        emit Traded(trades[0]);
         marketplace.accept(trades);
     }
 

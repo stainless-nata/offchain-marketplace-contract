@@ -80,7 +80,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
     event ContractSignatureIndexIncreased(uint256 _to, address _by);
     event SignerSignatureIndexIncreased(uint256 _to, address _by);
-    event Traded();
+    event Traded(Trade _trade);
 
     error InvalidSigner();
     error Expired();
@@ -178,7 +178,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             /// Increases the amount of times the signature has been used.
             signatureUses[hashedSignature]++;
 
-            emit Traded();
+            emit Traded(trade);
 
             /// Transfers the assets from the signer to the caller.
             _transferAssets(trade.sent, trade.signer, _msgSender());
