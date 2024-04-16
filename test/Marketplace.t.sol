@@ -123,7 +123,7 @@ contract MarketplaceTest is Test {
         vm.prank(owner);
         marketplace.pause();
         assertEq(marketplace.paused(), true);
-        
+
         vm.prank(owner);
         vm.expectEmit(address(marketplace));
         emit Unpaused(owner);
