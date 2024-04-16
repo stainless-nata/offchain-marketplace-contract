@@ -9,13 +9,6 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Pausable} from "lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
-error InvalidSigner();
-error Expired();
-error NotAllowed();
-error InvalidContractSignatureIndex();
-error InvalidSignerSignatureIndex();
-error SignatureReuse();
-
 abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// EIP712 Type hash for the Asset struct without the beneficiary.
     /// keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
@@ -32,11 +25,11 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
     /// Number used as part of the trade signature.
     /// Can be updated by the owner to invalidate all trades signed with it.
-    uint256 private contractSignatureIndex;
+    uint256 public contractSignatureIndex;
 
     /// Number used as part of the trade signature,
     /// Can be updated by the signer to invalidate all trades signed with it.
-    mapping(address => uint256) private signerSignatureIndex;
+    mapping(address => uint256) public signerSignatureIndex;
 
     /// Number of times a signature has been used.
     /// Depends on the trade how many times a signature can be used.
@@ -85,6 +78,16 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         Asset[] received;
     }
 
+    event ContractSignatureIndexIncreased(uint256 _to, address _by);
+    event SignerSignatureIndexIncreased(uint256 _to, address _by);
+
+    error InvalidSigner();
+    error Expired();
+    error NotAllowed();
+    error InvalidContractSignatureIndex();
+    error InvalidSignerSignatureIndex();
+    error SignatureReuse();
+
     /// @param _owner - The owner of the contract.
     constructor(address _owner) EIP712("Marketplace", "0.0.1") Ownable(_owner) {}
 
@@ -104,12 +107,16 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// Increasing it is a way to invalidate all trades signed with the previous value.
     function increaseContractSignatureIndex() external onlyOwner {
         contractSignatureIndex++;
+
+        emit ContractSignatureIndexIncreased(contractSignatureIndex, _msgSender());
     }
 
     /// Increases the signerSignatureIndex of the caller by 1.
     /// Increasing it is a way to invalidate all trades signed by the caller with the previous value.
     function increaseSignerSignatureIndex() external {
         signerSignatureIndex[_msgSender()]++;
+
+        emit SignerSignatureIndexIncreased(signerSignatureIndex[_msgSender()], _msgSender());
     }
 
     /// Main function of the contract.

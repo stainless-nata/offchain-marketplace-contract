@@ -130,4 +130,47 @@ contract MarketplaceTest is Test {
         marketplace.unpause();
         assertEq(marketplace.paused(), false);
     }
+
+    // Marketplace
+
+    event ContractSignatureIndexIncreased(uint256, address);
+    event SignerSignatureIndexIncreased(uint256, address);
+
+    // increaseContractSignatureIndex
+
+    function test_increaseContractSignatureIndex_RevertsIfNotOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.increaseContractSignatureIndex();
+    }
+
+    function test_increaseContractSignatureIndex_Increased() public {
+        assertEq(marketplace.contractSignatureIndex(), 0);
+
+        vm.prank(owner);
+        vm.expectEmit(address(marketplace));
+        emit ContractSignatureIndexIncreased(1, owner);
+        marketplace.increaseContractSignatureIndex();
+        assertEq(marketplace.contractSignatureIndex(), 1);
+    }
+
+    // increaseSignerSignatureIndex
+
+    function test_increaseSignerSignatureIndex_Increased() public {
+        assertEq(marketplace.signerSignatureIndex(owner), 0);
+
+        vm.prank(owner);
+        vm.expectEmit(address(marketplace));
+        emit SignerSignatureIndexIncreased(1, owner);
+        marketplace.increaseSignerSignatureIndex();
+        assertEq(marketplace.signerSignatureIndex(owner), 1);
+
+        assertEq(marketplace.signerSignatureIndex(other), 0);
+
+        vm.prank(other);
+        vm.expectEmit(address(marketplace));
+        emit SignerSignatureIndexIncreased(1, other);
+        marketplace.increaseSignerSignatureIndex();
+        assertEq(marketplace.signerSignatureIndex(other), 1);
+    }
 }
