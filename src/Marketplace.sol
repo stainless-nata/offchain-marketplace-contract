@@ -151,8 +151,6 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         }
     }
 
-    /// @param _trade - The trade to be hashed.
-    /// @return hash - The hash of the provided trade.
     function _hashTrade(Trade memory _trade) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
@@ -164,8 +162,6 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 _trade.contractSignatureIndex,
                 _trade.signerSignatureIndex,
                 abi.encodePacked(_trade.allowed),
-                /// The beneficiary of the sent assets are not hashed.
-                /// This makes it possible to the caller to decide at the time of the trade execution, to define who is going to receive the assets sent by the signer.
                 abi.encodePacked(_hashAssetsWithoutBeneficiary(_trade.sent)),
                 abi.encodePacked(_hashAssets(_trade.received))
             )
