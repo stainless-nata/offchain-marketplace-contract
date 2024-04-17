@@ -8,6 +8,7 @@ import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.s
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Pausable} from "lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {SignatureChecker} from "lib/openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
 
 abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// EIP712 Type hash for the Asset struct without the beneficiary.
@@ -82,7 +83,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     event SignerSignatureIndexIncreased(uint256 _to, address _by);
     event Traded(Trade _trade);
 
-    error InvalidSigner();
+    error InvalidSignature();
     error Expired();
     error NotAllowed();
     error InvalidContractSignatureIndex();
@@ -166,13 +167,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 }
             }
 
-            /// Recovers the address of the signer of the trade.
-            /// Used to verify that the trade values are what the signer has agreed upon.
-            address recovered = ECDSA.recover(_hashTypedDataV4(_hashTrade(trade)), trade.signature);
-
-            /// Fails if the recovered address is different from the signer of the trade.
-            if (recovered != trade.signer) {
-                revert InvalidSigner();
+            /// Fails if the provided signature is invalid.
+            if (!SignatureChecker.isValidSignatureNow(trade.signer, _hashTypedDataV4(_hashTrade(trade)), trade.signature)) {
+                revert InvalidSignature();
             }
 
             /// Increases the amount of times the signature has been used.

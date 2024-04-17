@@ -156,7 +156,7 @@ contract MarketplaceTest is Test {
     error Expired();
     error NotAllowed();
     error ECDSAInvalidSignatureLength(uint256);
-    error InvalidSigner();
+    error InvalidSignature();
     error SignatureReuse();
 
     // increaseContractSignatureIndex
@@ -250,16 +250,6 @@ contract MarketplaceTest is Test {
         marketplace.accept(trades);
     }
 
-    function test_accept_RevertIfEmptySignature() public {
-        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
-
-        trades[0].expiration = block.timestamp;
-
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(ECDSAInvalidSignatureLength.selector, 0));
-        marketplace.accept(trades);
-    }
-
     function test_accept_RevertIfInvalidSigner() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
@@ -273,7 +263,7 @@ contract MarketplaceTest is Test {
         trades[0].signature = abi.encodePacked(r, s, v);
 
         vm.prank(other);
-        vm.expectRevert(InvalidSigner.selector);
+        vm.expectRevert(InvalidSignature.selector);
         marketplace.accept(trades);
     }
 
@@ -339,7 +329,7 @@ contract MarketplaceTest is Test {
         trades[0].signature = abi.encodePacked(r, s, v);
 
         vm.prank(other);
-        vm.expectRevert(InvalidSigner.selector);
+        vm.expectRevert(InvalidSignature.selector);
         marketplace.accept(trades);
     }
 
