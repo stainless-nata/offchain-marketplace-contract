@@ -160,6 +160,7 @@ contract MarketplaceTest is Test {
     error InvalidSignature();
     error SignatureReuse();
     error CancelledSignature();
+    error NotEffective();
 
     // increaseContractSignatureIndex
 
@@ -273,6 +274,16 @@ contract MarketplaceTest is Test {
 
         vm.prank(other);
         vm.expectRevert(CancelledSignature.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertIfNotEffective() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].effective = block.timestamp + 1;
+
+        vm.prank(other);
+        vm.expectRevert(NotEffective.selector);
         marketplace.accept(trades);
     }
 

@@ -11,15 +11,15 @@ import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/Reentr
 import {SignatureChecker} from "lib/openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
 
 abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
-    /// keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
     bytes32 private constant ASSET_WO_BENEFICIARY_TYPE_HASH =
-        0x7be57332caf51c5f0f0fa0e7c362534d22d81c0bee1ffac9b573acd336e032bd;
+        keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)");
 
-    /// keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)")
-    bytes32 private constant ASSET_TYPE_HASH = 0xe5f9e1ebc316d1bde562c77f47da7dc2cccb903eb04f9b82e29212b96f9e57e1;
+    bytes32 private constant ASSET_TYPE_HASH =
+        keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)");
 
-    /// keccak256("Trade(uint256 uses,uint256 expiration,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,AssetWithBeneficiary[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
-    bytes32 private constant TRADE_TYPE_HASH = 0x2cb5b71f5756633db8ac23d6cea72af6b7e0d03bae2b258f89288bb7f045d851;
+    bytes32 private constant TRADE_TYPE_HASH = keccak256(
+        "Trade(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,AssetWithBeneficiary[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)"
+    );
 
     uint256 public contractSignatureIndex;
 
@@ -40,6 +40,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         bytes signature;
         uint256 uses;
         uint256 expiration;
+        uint256 effective;
         bytes32 salt;
         uint256 contractSignatureIndex;
         uint256 signerSignatureIndex;
@@ -60,6 +61,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     error InvalidSignerSignatureIndex();
     error SignatureReuse();
     error CancelledSignature();
+    error NotEffective();
 
     constructor(address _owner) EIP712("Marketplace", "0.0.1") Ownable(_owner) {}
 
@@ -109,6 +111,10 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 revert SignatureReuse();
             }
 
+            if (trade.effective > block.timestamp) {
+                revert NotEffective();
+            }
+
             if (contractSignatureIndex != trade.contractSignatureIndex) {
                 revert InvalidContractSignatureIndex();
             }
@@ -153,6 +159,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 TRADE_TYPE_HASH,
                 _trade.uses,
                 _trade.expiration,
+                _trade.effective,
                 _trade.salt,
                 _trade.contractSignatureIndex,
                 _trade.signerSignatureIndex,
@@ -198,9 +205,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     }
 
     function _verifyTradeSignature(Trade memory _trade, address _signer) private {
-        if (
-            !SignatureChecker.isValidSignatureNow(_signer, _hashTypedDataV4(_hashTrade(_trade)), _trade.signature)
-        ) {
+        if (!SignatureChecker.isValidSignatureNow(_signer, _hashTypedDataV4(_hashTrade(_trade)), _trade.signature)) {
             revert InvalidSignature();
         }
     }
