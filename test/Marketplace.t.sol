@@ -150,6 +150,7 @@ contract MarketplaceTest is Test {
     event ContractSignatureIndexIncreased(uint256, address);
     event SignerSignatureIndexIncreased(uint256, address);
     event Traded();
+    event SignatureCancelled();
 
     error InvalidContractSignatureIndex();
     error InvalidSignerSignatureIndex();
@@ -158,6 +159,7 @@ contract MarketplaceTest is Test {
     error ECDSAInvalidSignatureLength(uint256);
     error InvalidSignature();
     error SignatureReuse();
+    error CancelledSignature();
 
     // increaseContractSignatureIndex
 
@@ -197,6 +199,41 @@ contract MarketplaceTest is Test {
         assertEq(marketplace.signerSignatureIndex(other), 1);
     }
 
+    // cancelSignature
+
+    function test_cancelSignature_RevertIfInvalidSigner() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            signer.privateKey,
+            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+        );
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(other);
+        vm.expectRevert(InvalidSignature.selector);
+        marketplace.cancelSignature(trades);
+    }
+
+    function test_cancelSignature_CancelledSignature() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            signer.privateKey,
+            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+        );
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(signer.addr);
+        vm.expectEmit(address(marketplace));
+        emit SignatureCancelled();
+        marketplace.cancelSignature(trades);
+    }
+
     // accept
 
     function test_accept_RevertIfPaused() public {
@@ -215,6 +252,27 @@ contract MarketplaceTest is Test {
 
         vm.prank(other);
         vm.expectRevert(InvalidContractSignatureIndex.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertIfCancelledSignature() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            signer.privateKey,
+            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+        );
+
+        trades[0].signer = signer.addr;
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(signer.addr);
+        marketplace.cancelSignature(trades);
+
+        vm.prank(other);
+        vm.expectRevert(CancelledSignature.selector);
         marketplace.accept(trades);
     }
 
