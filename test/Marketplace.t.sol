@@ -3,8 +3,9 @@ pragma solidity ^0.8.20;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 import {VmSafe} from "lib/forge-std/src/Vm.sol";
-import {Marketplace} from "../src/Marketplace.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import {ERC1271WalletMock} from "lib/openzeppelin-contracts/contracts/mocks/ERC1271WalletMock.sol";
+import {Marketplace} from "../src/Marketplace.sol";
 
 contract MarketplaceHarness is Marketplace {
     constructor(address _owner) Marketplace(_owner) {}
@@ -421,6 +422,45 @@ contract MarketplaceTest is Test {
 
         vm.prank(other);
         vm.expectRevert(SignatureReuse.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertIfERC1271VerificationFails() public {
+        ERC1271WalletMock wallet = new ERC1271WalletMock(other);
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            signer.privateKey,
+            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+        );
+
+        trades[0].signer = address(wallet);
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(other);
+        vm.expectRevert(InvalidSignature.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_SignerIsERC1271() public {
+        ERC1271WalletMock wallet = new ERC1271WalletMock(signer.addr);
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            signer.privateKey,
+            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+        );
+
+        trades[0].signer = address(wallet);
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(other);
         marketplace.accept(trades);
     }
 }
