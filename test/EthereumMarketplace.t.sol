@@ -6,6 +6,7 @@ import {VmSafe} from "lib/forge-std/src/Vm.sol";
 import {EthereumMarketplace} from "../src/EthereumMarketplace.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
 
 contract MarketplaceHarness is EthereumMarketplace {
     constructor(address _owner) EthereumMarketplace(_owner) {}
@@ -19,68 +20,71 @@ contract MarketplaceHarness is EthereumMarketplace {
     }
 }
 
-contract Accept is Test {
-    VmSafe.Wallet owner;
+contract EthereumMarketplaceTest is Test {
     VmSafe.Wallet signer;
+    address caller;
 
-    MarketplaceHarness mkt;
+    MarketplaceHarness marketplace;
 
     function setUp() public {
-        uint256 fork = vm.createFork("https://rpc.decentraland.org/mainnet", 19662099);
-        vm.selectFork(fork);
+        string memory rpcUrl = "https://rpc.decentraland.org/mainnet";
+        uint256 blockNumber = 19684477; // Apr-18-2024 07:38:35 PM +UTC
 
-        owner = vm.createWallet("owner");
+        uint256 forkId = vm.createFork(rpcUrl, blockNumber);
+        vm.selectFork(forkId);
+
         signer = vm.createWallet("signer");
+        caller = vm.addr(0xB0C4);
 
-        mkt = new MarketplaceHarness(owner.addr);
+        address owner = vm.addr(0x1);
+        marketplace = new MarketplaceHarness(owner);
     }
 
-    function test_SetUpState() public view {
-        assertEq(mkt.owner(), owner.addr);
-    }
-
-    function test_SendUSDCReceiveMANA() public {
-        IERC20 usdt = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    function test_accept_sendLAND_receiveMANA() public {
         IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+        IERC721 land = IERC721(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d);
+        uint256 landTokenId = 20416942015256307807802476445906092687221;
 
-        // Address of account that will call the accept function.
-        address caller = 0x67c231cF2B0E9518aBa46bDea6b10E0D0C5fEd1B;
-
-        // Preprare tokens.
         {
-            // Send USDC to the signer.
-            vm.prank(0xD6153F5af5679a75cC85D8974463545181f48772);
-            usdt.transfer(signer.addr, 1000000);
+            address originalLandOwner = 0x9cbe520Aa4bFD545109026Bb1fdf9Ea54f476e5E;
+            address originalManaHolder = 0x46f80018211D5cBBc988e853A8683501FCA4ee9b;
 
-            // Approve the market contract to spend the USDC for the signer.
+            vm.prank(originalLandOwner);
+            land.transferFrom(originalLandOwner, signer.addr, landTokenId);
+
+            vm.prank(originalManaHolder);
+            mana.transfer(caller, 1 ether);
+
             vm.prank(signer.addr);
-            usdt.approve(address(mkt), 1000000);
+            land.setApprovalForAll(address(marketplace), true);
 
-            // Approve the market contract to spend the USDC for the caller.
             vm.prank(caller);
-            mana.approve(address(mkt), 1 ether);
+            mana.approve(address(marketplace), 1 ether);
+
+            assertEq(land.ownerOf(landTokenId), signer.addr);
+            assertEq(mana.balanceOf(caller), 1 ether);
         }
 
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
-        // Prepare trade.
         {
             trades[0].expiration = block.timestamp;
 
             trades[0].sent = new MarketplaceHarness.Asset[](1);
 
-            trades[0].sent[0].assetType = mkt.ERC20_ID();
-            trades[0].sent[0].contractAddress = address(usdt);
-            trades[0].sent[0].value = 1000000;
+            trades[0].sent[0].assetType = marketplace.ERC721_ID();
+            trades[0].sent[0].contractAddress = address(land);
+            trades[0].sent[0].value = landTokenId;
 
             trades[0].received = new MarketplaceHarness.Asset[](1);
 
-            trades[0].received[0].assetType = mkt.ERC20_ID();
+            trades[0].received[0].assetType = marketplace.ERC20_ID();
             trades[0].received[0].contractAddress = address(mana);
             trades[0].received[0].value = 1 ether;
 
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                signer.privateKey, MessageHashUtils.toTypedDataHash(mkt.getDomainSeparator(), mkt.hashTrade(trades[0]))
+                signer.privateKey,
+                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
             );
 
             trades[0].signer = signer.addr;
@@ -88,6 +92,9 @@ contract Accept is Test {
         }
 
         vm.prank(caller);
-        mkt.accept(trades);
+        marketplace.accept(trades);
+
+        assertEq(land.ownerOf(landTokenId), caller);
+        assertEq(mana.balanceOf(signer.addr), 1 ether);
     }
 }
