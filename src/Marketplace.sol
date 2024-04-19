@@ -200,7 +200,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         return hashes;
     }
 
-    function _verifyTradeSignature(Trade memory _trade, address _signer) private {
+    function _verifyTradeSignature(Trade memory _trade, address _signer) private view {
         if (!SignatureChecker.isValidSignatureNow(_signer, _hashTypedDataV4(_hashTrade(_trade)), _trade.signature)) {
             revert InvalidSignature();
         }
