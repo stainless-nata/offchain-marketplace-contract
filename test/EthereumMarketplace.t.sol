@@ -157,4 +157,62 @@ contract EthereumMarketplaceTest is Test {
         assertEq(estate.ownerOf(estateId), caller);
         assertEq(mana.balanceOf(signer.addr), 1 ether);
     }
+
+    function test_accept_sendName_receiveMANA() public {
+        IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+        IERC721 registrar = IERC721(0x2A187453064356c898cAe034EAed119E1663ACb8);
+        uint256 nameId = 111953866685194181316179970749576144183152508562302674483221441304598033207711;
+
+        {
+            address originalNameOwner = 0x6a45De91B516C17CacEC184506d719947613465E;
+            address originalManaHolder = 0x46f80018211D5cBBc988e853A8683501FCA4ee9b;
+
+            vm.prank(originalNameOwner);
+            registrar.transferFrom(originalNameOwner, signer.addr, nameId);
+
+            vm.prank(originalManaHolder);
+            mana.transfer(caller, 1 ether);
+
+            vm.prank(signer.addr);
+            registrar.setApprovalForAll(address(marketplace), true);
+
+            vm.prank(caller);
+            mana.approve(address(marketplace), 1 ether);
+
+            assertEq(registrar.ownerOf(nameId), signer.addr);
+            assertEq(mana.balanceOf(caller), 1 ether);
+        }
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        {
+            trades[0].expiration = block.timestamp;
+
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+
+            trades[0].sent[0].assetType = marketplace.ERC721_ID();
+            trades[0].sent[0].contractAddress = address(registrar);
+            trades[0].sent[0].value = nameId;
+
+            trades[0].received = new MarketplaceHarness.Asset[](1);
+
+            trades[0].received[0].assetType = marketplace.ERC20_ID();
+            trades[0].received[0].contractAddress = address(mana);
+            trades[0].received[0].value = 1 ether;
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                signer.privateKey,
+                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+            );
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(caller);
+        marketplace.accept(trades);
+
+        assertEq(registrar.ownerOf(nameId), caller);
+        assertEq(mana.balanceOf(signer.addr), 1 ether);
+    }
 }
