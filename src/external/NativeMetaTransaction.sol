@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.20;
 
-import {EIP712} from "lib/openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import {EIP712} from "./EIP712.sol";
 
 /// @dev This is a similar contract ti the one found at https://github.com/decentraland/common-contracts/blob/1c85438e913fe5affbef8e480c467585738e694a/contracts/meta-transactions/NativeMetaTransaction.sol.
 /// The differences being this this contract uses solidity 0.8.20 and does not use upgradeable OZ contracts.
