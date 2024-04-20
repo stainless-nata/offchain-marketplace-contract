@@ -7,6 +7,21 @@ import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/crypt
 import {ShortStrings, ShortString} from "lib/openzeppelin-contracts/contracts/utils/ShortStrings.sol";
 
 /**
+ * @dev Modified implementation of OpenZeppelin's EIP712 to address specific requirements.
+ * 
+ * The original implementation can be found at: 
+ * https://github.com/OpenZeppelin/openzeppelin-contracts/blob/dbb6104ce834628e473d2173bbc9d47f81a9eec3/contracts/utils/cryptography/EIP712.sol
+ *
+ * Changes from the OZ implementation include:
+ * 1. The TYPE_HASH no longer includes the chain ID. This modification allows users to sign messages for a different
+ *    blockchain than the one where the contract is deployed. To prevent replay attacks, the target chain ID is
+ *    specified in the `salt` parameter. This approach enhances user experience by eliminating the need for users
+ *    to switch chains just to sign messages.
+ * 2. Removed the IERC5267 interface and the associated eip712Domain function. The reason for this removal is that
+ *    the EIP712 domain structure in these contracts does not conform to the IERC5267 standard.
+ *
+ * All comments found underneath are from the original implementation.
+ *
  * @dev https://eips.ethereum.org/EIPS/eip-712[EIP 712] is a standard for hashing and signing of typed structured data.
  *
  * The encoding scheme specified in the EIP requires a domain separator and a hash of the typed structured data, whose

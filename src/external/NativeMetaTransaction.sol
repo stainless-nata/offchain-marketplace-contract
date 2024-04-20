@@ -4,8 +4,19 @@ pragma solidity 0.8.20;
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "./EIP712.sol";
 
-/// @dev This is a similar contract ti the one found at https://github.com/decentraland/common-contracts/blob/1c85438e913fe5affbef8e480c467585738e694a/contracts/meta-transactions/NativeMetaTransaction.sol.
-/// The differences being this this contract uses solidity 0.8.20 and does not use upgradeable OZ contracts.
+/**
+ * @dev Modified implementation of Decentraland's NativeMetaTransaction to address specific requirements.
+ *
+ * The original implementation can be found at:
+ * https://github.com/decentraland/common-contracts/blob/1c85438e913fe5affbef8e480c467585738e694a/contracts/meta-transactions/NativeMetaTransaction.sol.
+ *
+ * Changes from the Decentraland implementation include:
+ * 1. Updated solidity versin to 0.8.20.
+ * 2. Updated imports to use our modified EIP712 contract and the non upgradeable ECDSA contract from OpenZeppelin.
+ * 3. Removed init functions. This is not an upgradeable contract so they are not required.
+ *
+ * All comments found underneath are from the original implementation.
+ */
 abstract contract NativeMetaTransaction is EIP712 {
     /// @dev EIP712 type hash for recovering the signer from the signature.
     bytes32 private constant META_TRANSACTION_TYPEHASH = keccak256(bytes("MetaTransaction(uint256 nonce,address from,bytes functionData)"));
