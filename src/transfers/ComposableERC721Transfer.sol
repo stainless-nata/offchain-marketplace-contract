@@ -16,10 +16,6 @@ abstract contract ComposableERC721Transfer {
             revert InvalidFingerprint();
         }
 
-        if (data.length > 0) {
-            composableErc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value, data);
-        } else {
-            composableErc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value);
-        }
+        composableErc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value, data);
     }
 }

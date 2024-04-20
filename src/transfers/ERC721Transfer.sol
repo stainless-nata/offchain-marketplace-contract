@@ -6,12 +6,6 @@ import {Marketplace} from "../Marketplace.sol";
 
 abstract contract ERC721Transfer {
     function _transferERC721(Marketplace.Asset memory _asset, address _from) internal {
-        IERC721 erc721 = IERC721(_asset.contractAddress);
-
-        if (_asset.extra.length > 0) {
-            erc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value, _asset.extra);
-        } else {
-            erc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value);
-        }
+        IERC721(_asset.contractAddress).safeTransferFrom(_from, _asset.beneficiary, _asset.value, _asset.extra);
     }
 }
