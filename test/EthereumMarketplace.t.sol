@@ -27,6 +27,8 @@ contract EthereumMarketplaceTest is Test {
 
     MarketplaceHarness marketplace;
 
+    error UnsupportedAssetType(uint256 _assetType);
+
     function setUp() public {
         string memory rpcUrl = "https://rpc.decentraland.org/mainnet";
         uint256 blockNumber = 19684477; // Apr-18-2024 07:38:35 PM +UTC
@@ -39,6 +41,31 @@ contract EthereumMarketplaceTest is Test {
 
         address owner = vm.addr(0x1);
         marketplace = new MarketplaceHarness(owner);
+    }
+
+    function test_accept_RevertsIfUnsupportedAssetType() public {
+        uint256 assetType = 3;
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        {
+            trades[0].expiration = block.timestamp;
+
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+            trades[0].sent[0].assetType = assetType;
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                signer.privateKey,
+                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+            );
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSelector(UnsupportedAssetType.selector, assetType));
+        marketplace.accept(trades);
     }
 
     function test_accept_sendLAND_receiveMANA() public {
@@ -317,7 +344,7 @@ contract EthereumMarketplaceTest is Test {
 
             vm.prank(signer.addr);
             estate.setApprovalForAll(address(marketplace), true);
-            
+
             vm.prank(signer.addr);
             registrar.setApprovalForAll(address(marketplace), true);
 
