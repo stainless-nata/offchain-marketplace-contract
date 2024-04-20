@@ -28,6 +28,7 @@ contract EthereumMarketplaceTest is Test {
     MarketplaceHarness marketplace;
 
     error UnsupportedAssetType(uint256 _assetType);
+    error InvalidFingerprint();
 
     function setUp() public {
         string memory rpcUrl = "https://rpc.decentraland.org/mainnet";
@@ -249,6 +250,63 @@ contract EthereumMarketplaceTest is Test {
 
         assertEq(estate.ownerOf(estateId), caller);
         assertEq(mana.balanceOf(signer.addr), 1 ether);
+    }
+
+    function test_accept_sendEstate_receiveMANA_RevertsIfFingerprintIsInvalid() public {
+        IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+        IComposableERC721 estate = IComposableERC721(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        uint256 estateId = 5668;
+
+        {
+            address originalEstateOwner = 0x877a61D298eAf59f6d574e089216aC764ec00D2D;
+            address originalManaHolder = 0x46f80018211D5cBBc988e853A8683501FCA4ee9b;
+
+            vm.prank(originalEstateOwner);
+            estate.transferFrom(originalEstateOwner, signer.addr, estateId);
+
+            vm.prank(originalManaHolder);
+            mana.transfer(caller, 1 ether);
+
+            vm.prank(signer.addr);
+            estate.setApprovalForAll(address(marketplace), true);
+
+            vm.prank(caller);
+            mana.approve(address(marketplace), 1 ether);
+
+            assertEq(estate.ownerOf(estateId), signer.addr);
+            assertEq(mana.balanceOf(caller), 1 ether);
+        }
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        {
+            trades[0].expiration = block.timestamp;
+
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+
+            trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
+            trades[0].sent[0].contractAddress = address(estate);
+            trades[0].sent[0].value = estateId;
+            trades[0].sent[0].extra = abi.encode(bytes32(uint256(123)), bytes(""));
+
+            trades[0].received = new MarketplaceHarness.Asset[](1);
+
+            trades[0].received[0].assetType = marketplace.ERC20_ID();
+            trades[0].received[0].contractAddress = address(mana);
+            trades[0].received[0].value = 1 ether;
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                signer.privateKey,
+                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+            );
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(caller);
+        vm.expectRevert(InvalidFingerprint.selector);
+        marketplace.accept(trades);
     }
 
     function test_accept_sendName_receiveMANA() public {
