@@ -99,6 +99,72 @@ contract EthereumMarketplaceTest is Test {
         assertEq(mana.balanceOf(signer.addr), 1 ether);
     }
 
+    function test_accept_sendLAND_receiveMANA_withDAOFee() public {
+        IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+        IERC721 land = IERC721(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d);
+        uint256 landId = 20416942015256307807802476445906092687221;
+        address dao = 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce;
+        uint256 daoBalance = mana.balanceOf(dao);
+
+        {
+            address originalLandOwner = 0x9cbe520Aa4bFD545109026Bb1fdf9Ea54f476e5E;
+            address originalManaHolder = 0x46f80018211D5cBBc988e853A8683501FCA4ee9b;
+
+            vm.prank(originalLandOwner);
+            land.transferFrom(originalLandOwner, signer.addr, landId);
+
+            vm.prank(originalManaHolder);
+            mana.transfer(caller, 1 ether);
+
+            vm.prank(signer.addr);
+            land.setApprovalForAll(address(marketplace), true);
+
+            vm.prank(caller);
+            mana.approve(address(marketplace), 1 ether);
+
+            assertEq(land.ownerOf(landId), signer.addr);
+            assertEq(mana.balanceOf(caller), 1 ether);
+        }
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        {
+            trades[0].expiration = block.timestamp;
+
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+
+            trades[0].sent[0].assetType = marketplace.ERC721_ID();
+            trades[0].sent[0].contractAddress = address(land);
+            trades[0].sent[0].value = landId;
+
+            trades[0].received = new MarketplaceHarness.Asset[](2);
+
+            trades[0].received[0].assetType = marketplace.ERC20_ID();
+            trades[0].received[0].contractAddress = address(mana);
+            trades[0].received[0].value = 0.7 ether;
+
+            trades[0].received[1].assetType = marketplace.ERC20_ID();
+            trades[0].received[1].contractAddress = address(mana);
+            trades[0].received[1].value = 0.3 ether;
+            trades[0].received[1].beneficiary = dao;
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                signer.privateKey,
+                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
+            );
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(caller);
+        marketplace.accept(trades);
+
+        assertEq(land.ownerOf(landId), caller);
+        assertEq(mana.balanceOf(signer.addr), 0.7 ether);
+        assertEq(mana.balanceOf(dao), daoBalance + 0.3 ether);
+    }
+
     function test_accept_sendEstate_receiveMANA() public {
         IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
         IComposableERC721 estate = IComposableERC721(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
