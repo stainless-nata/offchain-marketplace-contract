@@ -18,7 +18,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)");
 
     bytes32 private constant TRADE_TYPE_HASH = keccak256(
-        "Trade(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,Asset[] sent,AssetWithBeneficiary[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)"
+        "Trade(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)"
     );
 
     uint256 public contractSignatureIndex;
@@ -161,14 +161,14 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 _trade.salt,
                 _trade.contractSignatureIndex,
                 _trade.signerSignatureIndex,
-                abi.encodePacked(_trade.allowed),
-                abi.encodePacked(_hashAssetsWithoutBeneficiary(_trade.sent)),
-                abi.encodePacked(_hashAssets(_trade.received))
+                keccak256(abi.encodePacked(_trade.allowed)),
+                _hashAssetsWithoutBeneficiary(_trade.sent),
+                _hashAssets(_trade.received)
             )
         );
     }
 
-    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32[] memory) {
+    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
@@ -181,10 +181,10 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             );
         }
 
-        return hashes;
+        return keccak256(abi.encodePacked(hashes));
     }
 
-    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32[] memory) {
+    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
@@ -197,7 +197,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             );
         }
 
-        return hashes;
+        return keccak256(abi.encodePacked(hashes));
     }
 
     function _verifyTradeSignature(Trade memory _trade, address _signer) private view {
