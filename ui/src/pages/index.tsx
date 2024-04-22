@@ -38,8 +38,8 @@ export default function Home() {
       {
         name: "Marketplace",
         version: "0.0.1",
-        chainId: chainId,
         verifyingContract: contractAddress,
+        salt,
       },
       {
         Trade: [
