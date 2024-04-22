@@ -1,12 +1,13 @@
 import Head from "next/head";
 import Image from "next/image";
 import styles from "@/styles/Home.module.css";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useWeb3ModalAccount, useWeb3ModalProvider } from "@web3modal/ethers/react";
 import { ethers } from "ethers";
 
-const expiration = Math.floor(Date.now() / 1000) + 31556952;
-const salt = ethers.zeroPadValue(ethers.toBeArray("1"), 32);
+const expiration = 2534279196; // 2050
+const chainId = 31337;
+const salt = ethers.zeroPadValue(ethers.toBeArray(chainId), 32);
 const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
 export default function Home() {
@@ -23,16 +24,22 @@ export default function Home() {
   };
 
   const handleOnSign = async () => {
-    const provider = new ethers.BrowserProvider(walletProvider!);
+    if (!walletProvider || !address) {
+      return;
+    }
+
+    const provider = new ethers.BrowserProvider(walletProvider);
 
     const signer = await provider.getSigner();
+
+    debugger
 
     const signature = await signer.signTypedData(
       {
         name: "Marketplace",
         version: "0.0.1",
+        chainId: chainId,
         verifyingContract: contractAddress,
-        salt,
       },
       {
         Trade: [
@@ -66,7 +73,7 @@ export default function Home() {
           },
           {
             name: "sent",
-            type: "Asset[]",
+            type: "AssetWithoutBeneficiary[]",
           },
           {
             name: "received",
@@ -93,6 +100,24 @@ export default function Home() {
           {
             name: "beneficiary",
             type: "address",
+          },
+        ],
+        AssetWithoutBeneficiary: [
+          {
+            name: "assetType",
+            type: "uint256",
+          },
+          {
+            name: "contractAddress",
+            type: "address",
+          },
+          {
+            name: "value",
+            type: "uint256",
+          },
+          {
+            name: "extra",
+            type: "bytes",
           },
         ],
       },
@@ -172,25 +197,19 @@ export default function Home() {
       signer
     );
 
-    const populated = await contract.accept.populateTransaction([
-      {
-        signer: address,
-        signature: signature,
-        uses: 1,
-        expiration,
-        effective: 0,
-        salt,
-        contractSignatureIndex: 0,
-        signerSignatureIndex: 0,
-        allowed: [],
-        sent: [],
-        received: [],
-      },
-    ]);
-
-		console.log(populated)
-
-		signer.sendTransaction(populated)
+    await contract.accept([{
+      signer: address,
+      signature: signature,
+      uses: 1,
+      expiration,
+      effective: 0,
+      salt,
+      contractSignatureIndex: 0,
+      signerSignatureIndex: 0,
+      allowed: [],
+      sent: [],
+      received: [],
+    }]);
   };
 
   return (
