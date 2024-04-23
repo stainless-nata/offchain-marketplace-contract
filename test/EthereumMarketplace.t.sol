@@ -55,10 +55,8 @@ contract EthereumMarketplaceTest is Test {
             trades[0].sent = new MarketplaceHarness.Asset[](1);
             trades[0].sent[0].assetType = assetType;
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                signer.privateKey,
-                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-            );
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signer = signer.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
@@ -111,10 +109,8 @@ contract EthereumMarketplaceTest is Test {
             trades[0].received[0].contractAddress = address(mana);
             trades[0].received[0].value = 1 ether;
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                signer.privateKey,
-                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-            );
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signer = signer.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
@@ -176,10 +172,8 @@ contract EthereumMarketplaceTest is Test {
             trades[0].received[1].value = 0.3 ether;
             trades[0].received[1].beneficiary = dao;
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                signer.privateKey,
-                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-            );
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signer = signer.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
@@ -236,10 +230,8 @@ contract EthereumMarketplaceTest is Test {
             trades[0].received[0].contractAddress = address(mana);
             trades[0].received[0].value = 1 ether;
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                signer.privateKey,
-                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-            );
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signer = signer.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
@@ -295,10 +287,8 @@ contract EthereumMarketplaceTest is Test {
             trades[0].received[0].contractAddress = address(mana);
             trades[0].received[0].value = 1 ether;
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                signer.privateKey,
-                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-            );
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signer = signer.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
@@ -351,10 +341,8 @@ contract EthereumMarketplaceTest is Test {
             trades[0].received[0].contractAddress = address(mana);
             trades[0].received[0].value = 1 ether;
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                signer.privateKey,
-                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-            );
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signer = signer.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
@@ -441,10 +429,8 @@ contract EthereumMarketplaceTest is Test {
             trades[0].received[0].contractAddress = address(mana);
             trades[0].received[0].value = 1 ether;
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                signer.privateKey,
-                MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-            );
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signer = signer.addr;
             trades[0].signature = abi.encodePacked(r, s, v);

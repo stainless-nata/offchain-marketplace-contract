@@ -10,16 +10,17 @@ import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/Reentr
 import {SignatureChecker} from "lib/openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
 import {EIP712} from "./external/EIP712.sol";
 
+/**
+ * @notice Marketplace contract that allows the execution of signed Trades.
+ * Users can sign a Trade indicating which assets are to be traded. Another user can the accept the Trade using the signature, executing the exchange.
+ */
 abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
-    bytes32 private constant ASSET_WO_BENEFICIARY_TYPE_HASH =
-        keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)");
-
-    bytes32 private constant ASSET_TYPE_HASH =
-        keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)");
-
-    bytes32 private constant TRADE_TYPE_HASH = keccak256(
-        "Trade(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)"
-    );
+    // keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
+    bytes32 private constant ASSET_WO_BENEFICIARY_TYPE_HASH = 0x7be57332caf51c5f0f0fa0e7c362534d22d81c0bee1ffac9b573acd336e032bd;
+    // keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)")
+    bytes32 private constant ASSET_TYPE_HASH = 0xe5f9e1ebc316d1bde562c77f47da7dc2cccb903eb04f9b82e29212b96f9e57e1;
+    // keccak256("Trade(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
+    bytes32 private constant TRADE_TYPE_HASH = 0xb967bcaa9c7a374d193cf0f8af42cb15a1f51f6e94e22610b82c42c7cb93dd86;
 
     uint256 public contractSignatureIndex;
 
@@ -174,11 +175,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         for (uint256 i = 0; i < hashes.length; i++) {
             Asset memory asset = _assets[i];
 
-            hashes[i] = keccak256(
-                abi.encode(
-                    ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, asset.extra
-                )
-            );
+            hashes[i] = keccak256(abi.encode(ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, asset.extra));
         }
 
         return keccak256(abi.encodePacked(hashes));
@@ -190,11 +187,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         for (uint256 i = 0; i < hashes.length; i++) {
             Asset memory asset = _assets[i];
 
-            hashes[i] = keccak256(
-                abi.encode(
-                    ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, asset.extra, asset.beneficiary
-                )
-            );
+            hashes[i] = keccak256(abi.encode(ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, asset.extra, asset.beneficiary));
         }
 
         return keccak256(abi.encodePacked(hashes));

@@ -206,10 +206,8 @@ contract MarketplaceTest is Test {
     function test_cancelSignature_RevertIfInvalidSigner() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signer = signer.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
@@ -222,10 +220,8 @@ contract MarketplaceTest is Test {
     function test_cancelSignature_CancelledSignature() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signer = signer.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
@@ -262,10 +258,8 @@ contract MarketplaceTest is Test {
 
         trades[0].expiration = block.timestamp;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signer = signer.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
@@ -325,10 +319,8 @@ contract MarketplaceTest is Test {
 
         trades[0].expiration = block.timestamp;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signature = abi.encodePacked(r, s, v);
 
@@ -342,10 +334,8 @@ contract MarketplaceTest is Test {
 
         trades[0].expiration = block.timestamp;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signer = signer.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
@@ -364,10 +354,8 @@ contract MarketplaceTest is Test {
 
         trades[0].sent[0].beneficiary = other;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].sent[0].beneficiary = owner;
 
@@ -388,10 +376,8 @@ contract MarketplaceTest is Test {
 
         trades[0].received[0].beneficiary = other;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].received[0].beneficiary = owner;
 
@@ -409,10 +395,8 @@ contract MarketplaceTest is Test {
         trades[0].expiration = block.timestamp;
         trades[0].uses = 1;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signer = signer.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
@@ -432,10 +416,8 @@ contract MarketplaceTest is Test {
 
         trades[0].expiration = block.timestamp;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signer = address(wallet);
         trades[0].signature = abi.encodePacked(r, s, v);
@@ -452,10 +434,8 @@ contract MarketplaceTest is Test {
 
         trades[0].expiration = block.timestamp;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signer.privateKey,
-            MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0]))
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signer = address(wallet);
         trades[0].signature = abi.encodePacked(r, s, v);
