@@ -37,6 +37,12 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @notice Tracks if a signature has been manually cancelled by their corresponding signers.
     mapping(bytes32 => bool) public cancelledSignatures;
 
+    /// @notice Tracks if a Trade has already been used.
+    /// @dev Trade ids are composed by hashing the salt + the received asset's contracts addresses and values.
+    /// Useful offchain to connect Trades and be able to cancel them all at once when one is accepted.
+    /// For example, on an Auction, when the best Trade bid is accepted, all other Trades from the same auction will be cancelled.
+    mapping(bytes32 => bool) public usedTradeIds;
+
     /// @dev Schema for a traded asset.
     /// @param assetType - The type of asset being traded. Useful for the implementation to know how to handle the asset.
     /// @param contractAddress - The address of the contract that holds the asset.
@@ -57,7 +63,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @param uses - How many times the signature can be used. 0 means it can be used indefinitely.
     /// @param expiration - The timestamp when the signature expires.
     /// @param effective - The timestamp when the signature can be used.
-    /// @param salt - A random number to make the signature unique.
+    /// @param salt - A random value to make the signature unique.
     /// @param contractSignatureIndex - The contract signature index that was used to sign the Trade.
     /// @param signerSignatureIndex - The signer signature index that was used to sign the Trade.
     /// @param allowed - An array of addresses that are allowed to accept the Trade. An empty array means any address can accept it.
@@ -79,17 +85,18 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
     event ContractSignatureIndexIncreased(uint256 _to, address _by);
     event SignerSignatureIndexIncreased(uint256 _to, address _by);
-    event Traded();
     event SignatureCancelled();
+    event Traded();
 
-    error InvalidSignature();
-    error Expired();
-    error NotAllowed();
+    error CancelledSignature();
+    error SignatureReuse();
+    error UsedTradeId();
+    error NotEffective();
     error InvalidContractSignatureIndex();
     error InvalidSignerSignatureIndex();
-    error SignatureReuse();
-    error CancelledSignature();
-    error NotEffective();
+    error Expired();
+    error NotAllowed();
+    error InvalidSignature();
 
     constructor(address _owner) EIP712("Marketplace", "0.0.1") Ownable(_owner) {}
 
@@ -147,6 +154,12 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 revert SignatureReuse();
             }
 
+            bytes32 tradeId = _tradeId(trade);
+
+            if (usedTradeIds[tradeId]) {
+                revert UsedTradeId();
+            }
+
             if (trade.effective > block.timestamp) {
                 revert NotEffective();
             }
@@ -178,6 +191,10 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             _verifyTradeSignature(trade, trade.signer);
 
             signatureUses[hashedSignature]++;
+
+            if (signatureUses[hashedSignature] == trade.uses) {
+                usedTradeIds[tradeId] = true;
+            }
 
             emit Traded();
 
@@ -232,6 +249,19 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         }
 
         return hashes;
+    }
+
+    /// @dev Generates a trade id from a Trade's salt and received assets.
+    function _tradeId(Trade memory _trade) public pure returns (bytes32) {
+        bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt));
+
+        for (uint256 i = 0; i < _trade.received.length; i++) {
+            Asset memory asset = _trade.received[i];
+
+            tradeId = keccak256(abi.encodePacked(tradeId, asset.contractAddress, asset.value));
+        }
+
+        return tradeId;
     }
 
     /// @dev Verifies that the signature provided in the Trade is valid.
