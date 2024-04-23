@@ -20,20 +20,22 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// keccak256("Trade(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
     bytes32 private constant TRADE_TYPE_HASH = 0xb967bcaa9c7a374d193cf0f8af42cb15a1f51f6e94e22610b82c42c7cb93dd86;
 
+    /// @notice The current contract signature index.
     /// Trades need to be signed with the current contract signature index.
     /// The owner of the contract can increase it to invalidate older signatures.
     uint256 public contractSignatureIndex;
 
+    /// @notice The current signer signature index. 
     /// Trades need to be signed with the current signer signature index.
     /// Any user can increase their signer index to invalidate their older signatures.
     mapping(address => uint256) public signerSignatureIndex;
 
-    /// Tracks how many times a signature has been used.
+    /// @notice How many times a signature has been used.
     /// Depending on the Trade, signatures can be used from 1 to an indefinite amount of times.
-    mapping(bytes32 => uint256) private signatureUses;
+    mapping(bytes32 => uint256) public signatureUses;
 
-    /// Trades signature that have been manually revoked by their signers.
-    mapping(bytes32 => bool) private cancelledSignatures;
+    /// @notice Tracks if a signature has been manually cancelled by their corresponding signers.
+    mapping(bytes32 => bool) public cancelledSignatures;
 
     /// @dev Schema for a traded asset.
     /// @param assetType - The type of asset being traded. Useful for the implementation to know how to handle the asset.
