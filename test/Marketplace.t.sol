@@ -10,7 +10,7 @@ import {Marketplace} from "../src/Marketplace.sol";
 contract MarketplaceHarness is Marketplace {
     constructor(address _owner) Marketplace(_owner) {}
 
-    function _transferAsset(Asset memory _asset, address _from) internal override {
+    function _transferAsset(Asset memory _asset, address _from, address _signer) internal override {
         // The contents of this function are to be tested on the corresponding Ethereum or Polygon marketplace contracts.
     }
 

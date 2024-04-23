@@ -25,7 +25,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// The owner of the contract can increase it to invalidate older signatures.
     uint256 public contractSignatureIndex;
 
-    /// @notice The current signer signature index. 
+    /// @notice The current signer signature index.
     /// Trades need to be signed with the current signer signature index.
     /// Any user can increase their signer index to invalidate their older signatures.
     mapping(address => uint256) public signerSignatureIndex;
@@ -181,9 +181,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
             emit Traded();
 
-            _transferAssets(trade.sent, trade.signer, _msgSender());
+            _transferAssets(trade.sent, trade.signer, _msgSender(), trade.signer);
 
-            _transferAssets(trade.received, _msgSender(), trade.signer);
+            _transferAssets(trade.received, _msgSender(), trade.signer, trade.signer);
         }
     }
 
@@ -213,7 +213,8 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         for (uint256 i = 0; i < hashes.length; i++) {
             Asset memory asset = _assets[i];
 
-            hashes[i] = keccak256(abi.encode(ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra)));
+            hashes[i] =
+                keccak256(abi.encode(ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra)));
         }
 
         return hashes;
@@ -226,7 +227,8 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         for (uint256 i = 0; i < hashes.length; i++) {
             Asset memory asset = _assets[i];
 
-            hashes[i] = keccak256(abi.encode(ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra), asset.beneficiary));
+            hashes[i] =
+                keccak256(abi.encode(ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra), asset.beneficiary));
         }
 
         return hashes;
@@ -241,7 +243,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
     /// @dev Transfers an array of assets from one address to another.
     /// If the asset has a defined beneficiary, the asset will be transferred to the beneficiary instead of the _to address.
-    function _transferAssets(Asset[] memory _assets, address _from, address _to) private {
+    function _transferAssets(Asset[] memory _assets, address _from, address _to, address _signer) private {
         for (uint256 i = 0; i < _assets.length; i++) {
             Asset memory asset = _assets[i];
 
@@ -249,10 +251,13 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 asset.beneficiary = _to;
             }
 
-            _transferAsset(asset, _from);
+            _transferAsset(asset, _from, _signer);
         }
     }
 
     /// @dev This function needs to be implemented by the child contract to handle the transfer of the assets.
-    function _transferAsset(Asset memory _asset, address _from) internal virtual;
+    /// @param _asset - The asset to be transferred.
+    /// @param _from - The address that is sending the asset.
+    /// @param _signer - The signer of the Trade.
+    function _transferAsset(Asset memory _asset, address _from, address _signer) internal virtual;
 }

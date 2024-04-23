@@ -15,7 +15,7 @@ contract EthereumMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, Comp
 
     constructor(address _owner) Marketplace(_owner) {}
 
-    function _transferAsset(Asset memory _asset, address _from) internal override {
+    function _transferAsset(Asset memory _asset, address _from, address _signer) internal override {
         if (_asset.assetType == ERC20_ID) {
             _transferERC20(_asset, _from);
         } else if (_asset.assetType == ERC721_ID) {

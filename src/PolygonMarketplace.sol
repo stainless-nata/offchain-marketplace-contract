@@ -16,13 +16,13 @@ contract PolygonMarketplace is Marketplace, ERC20Transfer, ERC721Transfer, Colle
 
     constructor(address _owner) Marketplace(_owner) {}
 
-    function _transferAsset(Asset memory _asset, address _from) internal override {
+    function _transferAsset(Asset memory _asset, address _from, address _signer) internal override {
         if (_asset.assetType == ERC20_ID) {
             _transferERC20(_asset, _from);
         } else if (_asset.assetType == ERC721_ID) {
             _transferERC721(_asset, _from);
         } else if (_asset.assetType == COLLECTION_ITEM_ID) {
-            _transferCollectionItem(_asset);
+            _transferCollectionItem(_asset, _signer);
         } else {
             revert UnsupportedAssetType(_asset.assetType);
         }
