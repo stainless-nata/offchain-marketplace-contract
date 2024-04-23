@@ -200,36 +200,36 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 _trade.contractSignatureIndex,
                 _trade.signerSignatureIndex,
                 keccak256(abi.encodePacked(_trade.allowed)),
-                _hashAssetsWithoutBeneficiary(_trade.sent),
-                _hashAssets(_trade.received)
+                keccak256(abi.encodePacked(_hashAssetsWithoutBeneficiary(_trade.sent))),
+                keccak256(abi.encodePacked(_hashAssets(_trade.received)))
             )
         );
     }
 
     /// @dev Hashes an array of assets without the beneficiary.
-    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32) {
+    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32[] memory) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
             Asset memory asset = _assets[i];
 
-            hashes[i] = keccak256(abi.encode(ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, asset.extra));
+            hashes[i] = keccak256(abi.encode(ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra)));
         }
 
-        return keccak256(abi.encodePacked(hashes));
+        return hashes;
     }
 
     /// @dev Hashes an array of assets.
-    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32) {
+    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32[] memory) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
             Asset memory asset = _assets[i];
 
-            hashes[i] = keccak256(abi.encode(ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, asset.extra, asset.beneficiary));
+            hashes[i] = keccak256(abi.encode(ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra), asset.beneficiary));
         }
 
-        return keccak256(abi.encodePacked(hashes));
+        return hashes;
     }
 
     /// @dev Verifies that the signature provided in the Trade is valid.
