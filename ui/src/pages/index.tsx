@@ -32,8 +32,6 @@ export default function Home() {
 
     const signer = await provider.getSigner();
 
-    debugger
-
     const signature = await signer.signTypedData(
       {
         name: "Marketplace",
@@ -128,9 +126,37 @@ export default function Home() {
         salt,
         contractSignatureIndex: 0,
         signerSignatureIndex: 0,
-        allowed: [],
-        sent: [],
-        received: [],
+        allowed: [address],
+        sent: [
+          {
+            assetType: 0,
+            contractAddress: ethers.ZeroAddress,
+            value: 1000,
+            extra: ethers.toUtf8Bytes("sdfgdsfgsdfgfsd"),
+          },
+          {
+            assetType: 1,
+            contractAddress: ethers.ZeroAddress,
+            value: 532523462354,
+            extra: ethers.toUtf8Bytes("sadfasdgasdg"),
+          },
+        ],
+        received: [
+          {
+            assetType: 0,
+            contractAddress: ethers.ZeroAddress,
+            value: 1000,
+            extra: ethers.toUtf8Bytes("sdfgdsfgsdfgfsd"),
+            beneficiary: ethers.ZeroAddress,
+          },
+          {
+            assetType: 1,
+            contractAddress: ethers.ZeroAddress,
+            value: 532523462354,
+            extra: ethers.toUtf8Bytes("sadfasdgasdg"),
+            beneficiary: address,
+          },
+        ],
       }
     );
 
@@ -138,7 +164,11 @@ export default function Home() {
   };
 
   const handleAccept = async () => {
-    const provider = new ethers.BrowserProvider(walletProvider!);
+    if (!address || !walletProvider) {
+      return;
+    }
+
+    const provider = new ethers.BrowserProvider(walletProvider);
 
     const signer = await provider.getSigner();
 
@@ -197,19 +227,51 @@ export default function Home() {
       signer
     );
 
-    await contract.accept([{
-      signer: address,
-      signature: signature,
-      uses: 1,
-      expiration,
-      effective: 0,
-      salt,
-      contractSignatureIndex: 0,
-      signerSignatureIndex: 0,
-      allowed: [],
-      sent: [],
-      received: [],
-    }]);
+    await contract.accept([
+      {
+        signer: address,
+        signature: signature,
+        uses: 1,
+        expiration,
+        effective: 0,
+        salt,
+        contractSignatureIndex: 0,
+        signerSignatureIndex: 0,
+        allowed: [address],
+        sent: [
+          {
+            assetType: 0,
+            contractAddress: ethers.ZeroAddress,
+            value: 1000,
+            extra: ethers.toUtf8Bytes("sdfgdsfgsdfgfsd"),
+            beneficiary: ethers.ZeroAddress,
+          },
+          {
+            assetType: 1,
+            contractAddress: ethers.ZeroAddress,
+            value: 532523462354,
+            extra: ethers.toUtf8Bytes("sadfasdgasdg"),
+            beneficiary: address,
+          },
+        ],
+        received: [
+          {
+            assetType: 0,
+            contractAddress: ethers.ZeroAddress,
+            value: 1000,
+            extra: ethers.toUtf8Bytes("sdfgdsfgsdfgfsd"),
+            beneficiary: ethers.ZeroAddress,
+          },
+          {
+            assetType: 1,
+            contractAddress: ethers.ZeroAddress,
+            value: 532523462354,
+            extra: ethers.toUtf8Bytes("sadfasdgasdg"),
+            beneficiary: address,
+          },
+        ],
+      },
+    ]);
   };
 
   return (
