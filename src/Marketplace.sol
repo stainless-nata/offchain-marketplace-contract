@@ -176,7 +176,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             }
 
             address caller = _msgSender();
-
+            
             bytes32 tradeId = _tradeId(trade, caller);
 
             if (usedTradeIds[tradeId]) {
@@ -191,7 +191,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 revert InvalidContractSignatureIndex();
             }
 
-            if (signerSignatureIndex[trade.signer] != trade.signerSignatureIndex) {
+            address signer = trade.signer;
+
+            if (signerSignatureIndex[signer] != trade.signerSignatureIndex) {
                 revert InvalidSignerSignatureIndex();
             }
 
@@ -211,7 +213,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 }
             }
 
-            _verifyTradeSignature(trade, trade.signer);
+            _verifyTradeSignature(trade, signer);
 
             signatureUses[hashedSignature]++;
 
@@ -221,9 +223,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
             emit Traded();
 
-            _transferAssets(trade.sent, trade.signer, caller, trade.signer);
+            _transferAssets(trade.sent, signer, caller, signer);
 
-            _transferAssets(trade.received, caller, trade.signer, trade.signer);
+            _transferAssets(trade.received, caller, signer, signer);
         }
     }
 
