@@ -25,10 +25,10 @@ contract MarketplaceHarness is Marketplace {
 
 contract MarketplaceTest is Test {
     address owner;
-    address other;
-    address third;
+    address caller1;
+    address caller2;
 
-    VmSafe.Wallet signer;
+    VmSafe.Wallet signer1;
     VmSafe.Wallet signer2;
     VmSafe.Wallet signer3;
 
@@ -36,10 +36,11 @@ contract MarketplaceTest is Test {
 
     function setUp() public {
         owner = vm.addr(0x1);
-        other = vm.addr(0x2);
-        third = vm.addr(0x3);
+        
+        caller1 = vm.addr(0x2);
+        caller2 = vm.addr(0x3);
 
-        signer = vm.createWallet("signer");
+        signer1 = vm.createWallet("signer1");
         signer2 = vm.createWallet("signer2");
         signer3 = vm.createWallet("signer3");
 
@@ -62,15 +63,15 @@ contract MarketplaceTest is Test {
     function test_transferOwnership_OwnershipTransferred() public {
         vm.prank(owner);
         vm.expectEmit(address(marketplace));
-        emit OwnershipTransferred(owner, other);
-        marketplace.transferOwnership(other);
-        assertEq(marketplace.owner(), other);
+        emit OwnershipTransferred(owner, caller1);
+        marketplace.transferOwnership(caller1);
+        assertEq(marketplace.owner(), caller1);
     }
 
     function test_transferOwnership_RevertIfNotOwner() public {
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
-        marketplace.transferOwnership(other);
+        vm.prank(caller1);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, caller1));
+        marketplace.transferOwnership(caller1);
     }
 
     function test_transferOwnership_RevertIfAddressZero() public {
@@ -89,8 +90,8 @@ contract MarketplaceTest is Test {
     }
 
     function test_renounceOwnership_RevertIfNotOwner() public {
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        vm.prank(caller1);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, caller1));
         marketplace.renounceOwnership();
     }
 
@@ -104,8 +105,8 @@ contract MarketplaceTest is Test {
     // pause
 
     function test_pause_RevertIfNotOwner() public {
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        vm.prank(caller1);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, caller1));
         marketplace.pause();
     }
 
@@ -129,8 +130,8 @@ contract MarketplaceTest is Test {
     // unpause
 
     function test_unpause_RevertIfNotOwner() public {
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        vm.prank(caller1);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, caller1));
         marketplace.unpause();
     }
 
@@ -172,8 +173,8 @@ contract MarketplaceTest is Test {
     // increaseContractSignatureIndex
 
     function test_increaseContractSignatureIndex_RevertIfNotOwner() public {
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        vm.prank(caller1);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, caller1));
         marketplace.increaseContractSignatureIndex();
     }
 
@@ -198,13 +199,13 @@ contract MarketplaceTest is Test {
         marketplace.increaseSignerSignatureIndex();
         assertEq(marketplace.signerSignatureIndex(owner), 1);
 
-        assertEq(marketplace.signerSignatureIndex(other), 0);
+        assertEq(marketplace.signerSignatureIndex(caller1), 0);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectEmit(address(marketplace));
-        emit SignerSignatureIndexIncreased(1, other);
+        emit SignerSignatureIndexIncreased(1, caller1);
         marketplace.increaseSignerSignatureIndex();
-        assertEq(marketplace.signerSignatureIndex(other), 1);
+        assertEq(marketplace.signerSignatureIndex(caller1), 1);
     }
 
     // cancelSignature
@@ -213,12 +214,12 @@ contract MarketplaceTest is Test {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-        trades[0].signer = signer.addr;
+        trades[0].signer = signer1.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(InvalidSignature.selector);
         marketplace.cancelSignature(trades);
     }
@@ -227,12 +228,12 @@ contract MarketplaceTest is Test {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-        trades[0].signer = signer.addr;
+        trades[0].signer = signer1.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(signer.addr);
+        vm.prank(signer1.addr);
         vm.expectEmit(address(marketplace));
         emit SignatureCancelled();
         marketplace.cancelSignature(trades);
@@ -254,7 +255,7 @@ contract MarketplaceTest is Test {
 
         trades[0].contractSignatureIndex = 1;
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(InvalidContractSignatureIndex.selector);
         marketplace.accept(trades);
     }
@@ -265,15 +266,15 @@ contract MarketplaceTest is Test {
         trades[0].expiration = block.timestamp;
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-        trades[0].signer = signer.addr;
+        trades[0].signer = signer1.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(signer.addr);
+        vm.prank(signer1.addr);
         marketplace.cancelSignature(trades);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(CancelledSignature.selector);
         marketplace.accept(trades);
     }
@@ -283,7 +284,7 @@ contract MarketplaceTest is Test {
 
         trades[0].effective = block.timestamp + 1;
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(NotEffective.selector);
         marketplace.accept(trades);
     }
@@ -293,7 +294,7 @@ contract MarketplaceTest is Test {
 
         trades[0].signerSignatureIndex = 1;
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(InvalidSignerSignatureIndex.selector);
         marketplace.accept(trades);
     }
@@ -303,7 +304,7 @@ contract MarketplaceTest is Test {
 
         trades[0].expiration = block.timestamp - 1;
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(Expired.selector);
         marketplace.accept(trades);
     }
@@ -315,7 +316,7 @@ contract MarketplaceTest is Test {
         trades[0].allowed = new address[](1);
         trades[0].allowed[0] = owner;
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(NotAllowed.selector);
         marketplace.accept(trades);
     }
@@ -326,11 +327,11 @@ contract MarketplaceTest is Test {
         trades[0].expiration = block.timestamp;
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(InvalidSignature.selector);
         marketplace.accept(trades);
     }
@@ -341,12 +342,12 @@ contract MarketplaceTest is Test {
         trades[0].expiration = block.timestamp;
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-        trades[0].signer = signer.addr;
+        trades[0].signer = signer1.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectEmit(address(marketplace));
         emit Traded();
         marketplace.accept(trades);
@@ -358,17 +359,17 @@ contract MarketplaceTest is Test {
         trades[0].expiration = block.timestamp;
         trades[0].sent = new MarketplaceHarness.Asset[](1);
 
-        trades[0].sent[0].beneficiary = other;
+        trades[0].sent[0].beneficiary = caller1;
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].sent[0].beneficiary = owner;
 
-        trades[0].signer = signer.addr;
+        trades[0].signer = signer1.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectEmit(address(marketplace));
         emit Traded();
         marketplace.accept(trades);
@@ -380,17 +381,17 @@ contract MarketplaceTest is Test {
         trades[0].expiration = block.timestamp;
         trades[0].received = new MarketplaceHarness.Asset[](1);
 
-        trades[0].received[0].beneficiary = other;
+        trades[0].received[0].beneficiary = caller1;
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].received[0].beneficiary = owner;
 
-        trades[0].signer = signer.addr;
+        trades[0].signer = signer1.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(InvalidSignature.selector);
         marketplace.accept(trades);
     }
@@ -402,51 +403,51 @@ contract MarketplaceTest is Test {
         trades[0].uses = 1;
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-        trades[0].signer = signer.addr;
+        trades[0].signer = signer1.addr;
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(other);
+        vm.prank(caller1);
         marketplace.accept(trades);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(SignatureReuse.selector);
         marketplace.accept(trades);
     }
 
     function test_accept_RevertIfERC1271VerificationFails() public {
-        ERC1271WalletMock wallet = new ERC1271WalletMock(other);
+        ERC1271WalletMock wallet = new ERC1271WalletMock(caller1);
 
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].expiration = block.timestamp;
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signer = address(wallet);
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(InvalidSignature.selector);
         marketplace.accept(trades);
     }
 
     function test_accept_SignerIsERC1271() public {
-        ERC1271WalletMock wallet = new ERC1271WalletMock(signer.addr);
+        ERC1271WalletMock wallet = new ERC1271WalletMock(signer1.addr);
 
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].expiration = block.timestamp;
 
         (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
         trades[0].signer = address(wallet);
         trades[0].signature = abi.encodePacked(r, s, v);
 
-        vm.prank(other);
+        vm.prank(caller1);
         marketplace.accept(trades);
     }
 
@@ -458,25 +459,25 @@ contract MarketplaceTest is Test {
             trades[0].uses = 1;
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-            trades[0].signer = signer.addr;
+            trades[0].signer = signer1.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         marketplace.accept(trades);
 
         {
             trades[0].expiration = block.timestamp + 1;
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(UsedTradeId.selector);
         marketplace.accept(trades);
     }
@@ -489,29 +490,29 @@ contract MarketplaceTest is Test {
             trades[0].uses = 2;
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-            trades[0].signer = signer.addr;
+            trades[0].signer = signer1.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         marketplace.accept(trades);
 
-        vm.prank(other);
+        vm.prank(caller1);
         marketplace.accept(trades);
 
         {
             trades[0].expiration = block.timestamp + 1;
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-            trades[0].signer = signer.addr;
+            trades[0].signer = signer1.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(UsedTradeId.selector);
         marketplace.accept(trades);
     }
@@ -524,25 +525,25 @@ contract MarketplaceTest is Test {
             trades[0].uses = 1;
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-            trades[0].signer = signer.addr;
+            trades[0].signer = signer1.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         marketplace.accept(trades);
 
         {
             trades[0].expiration = block.timestamp + 1;
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(UsedTradeId.selector);
         marketplace.accept(trades);
 
@@ -550,12 +551,12 @@ contract MarketplaceTest is Test {
             trades[0].salt = bytes32(abi.encode(1));
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         marketplace.accept(trades);
     }
 
@@ -567,29 +568,29 @@ contract MarketplaceTest is Test {
             trades[0].uses = 1;
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-            trades[0].signer = signer.addr;
+            trades[0].signer = signer1.addr;
             trades[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         marketplace.accept(trades);
 
         {
             trades[0].expiration = block.timestamp + 1;
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
             trades[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(UsedTradeId.selector);
         marketplace.accept(trades);
 
-        vm.prank(third);
+        vm.prank(caller2);
         marketplace.accept(trades);
     }
 
@@ -600,12 +601,12 @@ contract MarketplaceTest is Test {
             offerA[0].expiration = block.timestamp;
             offerA[0].uses = 1;
             offerA[0].allowed = new address[](1);
-            offerA[0].allowed[0] = other;
+            offerA[0].allowed[0] = caller1;
 
             (uint8 v, bytes32 r, bytes32 s) =
-                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(offerA[0])));
+                vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(offerA[0])));
 
-            offerA[0].signer = signer.addr;
+            offerA[0].signer = signer1.addr;
             offerA[0].signature = abi.encodePacked(r, s, v);
         }
 
@@ -615,7 +616,7 @@ contract MarketplaceTest is Test {
             offerB[0].expiration = block.timestamp;
             offerB[0].uses = 1;
             offerB[0].allowed = new address[](1);
-            offerB[0].allowed[0] = other;
+            offerB[0].allowed[0] = caller1;
 
             (uint8 v, bytes32 r, bytes32 s) =
                 vm.sign(signer2.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(offerB[0])));
@@ -630,7 +631,7 @@ contract MarketplaceTest is Test {
             offerC[0].expiration = block.timestamp;
             offerC[0].uses = 1;
             offerC[0].allowed = new address[](1);
-            offerC[0].allowed[0] = other;
+            offerC[0].allowed[0] = caller1;
 
             (uint8 v, bytes32 r, bytes32 s) =
                 vm.sign(signer3.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(offerC[0])));
@@ -639,14 +640,14 @@ contract MarketplaceTest is Test {
             offerC[0].signature = abi.encodePacked(r, s, v);
         }
 
-        vm.prank(other);
+        vm.prank(caller1);
         marketplace.accept(offerA);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(UsedTradeId.selector);
         marketplace.accept(offerB);
 
-        vm.prank(other);
+        vm.prank(caller1);
         vm.expectRevert(UsedTradeId.selector);
         marketplace.accept(offerC);
     }
