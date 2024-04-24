@@ -138,9 +138,11 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
     /// @notice Any user can increase their signer signature index to invalidate all Trades signed with a lower index.
     function increaseSignerSignatureIndex() external {
-        signerSignatureIndex[_msgSender()]++;
+        address caller = _msgSender();
 
-        emit SignerSignatureIndexIncreased(signerSignatureIndex[_msgSender()], _msgSender());
+        signerSignatureIndex[caller]++;
+
+        emit SignerSignatureIndexIncreased(signerSignatureIndex[caller], caller);
     }
 
     /// @notice Signers can cancel their Trade signatured to prevent them from being used.
@@ -173,7 +175,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 revert SignatureReuse();
             }
 
-            bytes32 tradeId = _tradeId(trade);
+            address caller = _msgSender();
+
+            bytes32 tradeId = _tradeId(trade, caller);
 
             if (usedTradeIds[tradeId]) {
                 revert UsedTradeId();
@@ -197,7 +201,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
             if (trade.allowed.length > 0) {
                 for (uint256 j = 0; j < trade.allowed.length; j++) {
-                    if (trade.allowed[j] == _msgSender()) {
+                    if (trade.allowed[j] == caller) {
                         break;
                     }
 
@@ -217,9 +221,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
             emit Traded();
 
-            _transferAssets(trade.sent, trade.signer, _msgSender(), trade.signer);
+            _transferAssets(trade.sent, trade.signer, caller, trade.signer);
 
-            _transferAssets(trade.received, _msgSender(), trade.signer, trade.signer);
+            _transferAssets(trade.received, caller, trade.signer, trade.signer);
         }
     }
 
@@ -271,8 +275,8 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     }
 
     /// @dev Generates a trade id from a Trade's salt, the msg.sender of the transaction, and the received assets.
-    function _tradeId(Trade memory _trade) public view returns (bytes32) {
-        bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt, _msgSender()));
+    function _tradeId(Trade memory _trade, address _caller) public view returns (bytes32) {
+        bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt, _caller));
 
         for (uint256 i = 0; i < _trade.received.length; i++) {
             Asset memory asset = _trade.received[i];
