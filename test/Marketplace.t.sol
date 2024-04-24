@@ -26,16 +26,22 @@ contract MarketplaceHarness is Marketplace {
 contract MarketplaceTest is Test {
     address owner;
     address other;
+    address third;
 
     VmSafe.Wallet signer;
+    VmSafe.Wallet signer2;
+    VmSafe.Wallet signer3;
 
     MarketplaceHarness marketplace;
 
     function setUp() public {
         owner = vm.addr(0x1);
         other = vm.addr(0x2);
+        third = vm.addr(0x3);
 
         signer = vm.createWallet("signer");
+        signer2 = vm.createWallet("signer2");
+        signer3 = vm.createWallet("signer3");
 
         marketplace = new MarketplaceHarness(owner);
     }
@@ -442,5 +448,206 @@ contract MarketplaceTest is Test {
 
         vm.prank(other);
         marketplace.accept(trades);
+    }
+
+    function test_accept_RevertsIfTradeIdIsReused() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        {
+            trades[0].expiration = block.timestamp;
+            trades[0].uses = 1;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        {
+            trades[0].expiration = block.timestamp + 1;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        vm.expectRevert(UsedTradeId.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertsIfTradeIdIsReused_OnlyAfterSignatureReusesReachesItsLimit() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        {
+            trades[0].expiration = block.timestamp;
+            trades[0].uses = 2;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        {
+            trades[0].expiration = block.timestamp + 1;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        vm.expectRevert(UsedTradeId.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_CanTradeSameReceivedAssetsWithADifferentSalt() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        {
+            trades[0].expiration = block.timestamp;
+            trades[0].uses = 1;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        {
+            trades[0].expiration = block.timestamp + 1;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        vm.expectRevert(UsedTradeId.selector);
+        marketplace.accept(trades);
+
+        {
+            trades[0].salt = bytes32(abi.encode(1));
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_AnotherUserCanAcceptTradeWithSameSaltAndReceivedAssets() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        {
+            trades[0].expiration = block.timestamp;
+            trades[0].uses = 1;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        {
+            trades[0].expiration = block.timestamp + 1;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        vm.expectRevert(UsedTradeId.selector);
+        marketplace.accept(trades);
+
+        vm.prank(third);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertsIfTryingToAcceptDifferentTradeFromFinishedAuction() public {
+        MarketplaceHarness.Trade[] memory offerA = new MarketplaceHarness.Trade[](1);
+
+        {
+            offerA[0].expiration = block.timestamp;
+            offerA[0].uses = 1;
+            offerA[0].allowed = new address[](1);
+            offerA[0].allowed[0] = other;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(offerA[0])));
+
+            offerA[0].signer = signer.addr;
+            offerA[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        MarketplaceHarness.Trade[] memory offerB = new MarketplaceHarness.Trade[](1);
+
+        {
+            offerB[0].expiration = block.timestamp;
+            offerB[0].uses = 1;
+            offerB[0].allowed = new address[](1);
+            offerB[0].allowed[0] = other;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer2.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(offerB[0])));
+
+            offerB[0].signer = signer2.addr;
+            offerB[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        MarketplaceHarness.Trade[] memory offerC = new MarketplaceHarness.Trade[](1);
+
+        {
+            offerC[0].expiration = block.timestamp;
+            offerC[0].uses = 1;
+            offerC[0].allowed = new address[](1);
+            offerC[0].allowed[0] = other;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer3.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(offerC[0])));
+
+            offerC[0].signer = signer3.addr;
+            offerC[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(other);
+        marketplace.accept(offerA);
+
+        vm.prank(other);
+        vm.expectRevert(UsedTradeId.selector);
+        marketplace.accept(offerB);
+
+        vm.prank(other);
+        vm.expectRevert(UsedTradeId.selector);
+        marketplace.accept(offerC);
     }
 }
