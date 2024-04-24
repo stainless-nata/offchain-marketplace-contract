@@ -38,9 +38,28 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     mapping(bytes32 => bool) public cancelledSignatures;
 
     /// @notice Tracks if a Trade has already been used.
-    /// @dev Trade ids are composed by hashing the salt + the received asset's contracts addresses and values.
-    /// Useful offchain to connect Trades and be able to cancel them all at once when one is accepted.
-    /// For example, on an Auction, when the best Trade bid is accepted, all other Trades from the same auction will be cancelled.
+    /// @dev Trade Ids are composed from the result of hashing the salt, the msg.sender and the received assets.
+    ///
+    /// This allows connecting Trades, allowing a way in which after one Trade is accepted, all those related Trades can be automatically invalidated.
+    ///
+    /// For example: 
+    /// 
+    /// User A wants to make an Auction to sell Asset A
+    /// 
+    /// User B signs a Trade to buy Asset A from User A for 100 DAI
+    /// User C signs a Trade to buy Asset A from User A for 200 DAI
+    /// User D signs a Trade to buy Asset A from User A for 300 DAI (All these use the same salt)
+    /// 
+    /// User A accepts the Trade from User D
+    /// 
+    /// The Trades signed by User B and User C are automatically invalidated, and User A can't accept them anymore.
+    ///
+    /// NOTE: To make the best use out of this feature, it is recommended to set only the address of the user that can accept the Trade in the allowed field.
+    /// On the previous example, if the allowed field was empty or had more than just User A, other addresses would be able to accept those Trades.
+    ///
+    /// NOTE: Trade Ids are recorded only when a signature has been used the amount of times specified in the Trade.
+    /// This means that if a Trade has a uses value of 0, the Trade Id will never be recorded.
+    /// Or if the Trades has 100 uses, the Trade Id will only be recorded after the 100th use.
     mapping(bytes32 => bool) public usedTradeIds;
 
     /// @dev Schema for a traded asset.
@@ -251,9 +270,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         return hashes;
     }
 
-    /// @dev Generates a trade id from a Trade's salt and received assets.
-    function _tradeId(Trade memory _trade) public pure returns (bytes32) {
-        bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt));
+    /// @dev Generates a trade id from a Trade's salt, the msg.sender of the transaction, and the received assets.
+    function _tradeId(Trade memory _trade) public view returns (bytes32) {
+        bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt, _msgSender()));
 
         for (uint256 i = 0; i < _trade.received.length; i++) {
             Asset memory asset = _trade.received[i];
