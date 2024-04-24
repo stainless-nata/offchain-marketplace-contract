@@ -202,14 +202,17 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             }
 
             if (trade.allowed.length > 0) {
+                bool isAllowed = false;
+
                 for (uint256 j = 0; j < trade.allowed.length; j++) {
                     if (trade.allowed[j] == caller) {
+                        isAllowed = true;
                         break;
                     }
+                }
 
-                    if (j == trade.allowed.length - 1) {
-                        revert NotAllowed();
-                    }
+                if (!isAllowed) {
+                    revert NotAllowed();
                 }
             }
 
@@ -277,7 +280,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     }
 
     /// @dev Generates a trade id from a Trade's salt, the msg.sender of the transaction, and the received assets.
-    function _tradeId(Trade memory _trade, address _caller) public view returns (bytes32) {
+    function _tradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
         bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt, _caller));
 
         for (uint256 i = 0; i < _trade.received.length; i++) {
