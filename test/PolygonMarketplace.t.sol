@@ -7,6 +7,7 @@ import {PolygonMarketplace} from "../src/PolygonMarketplace.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
+import {ICollection} from "src/interfaces/ICollection.sol";
 
 contract MarketplaceHarness is PolygonMarketplace {
     constructor(address _owner) PolygonMarketplace(_owner) {}
@@ -22,12 +23,14 @@ contract MarketplaceHarness is PolygonMarketplace {
 
 contract PolygonMarketplaceTest is Test {
     VmSafe.Wallet signer;
+
     address caller;
 
     MarketplaceHarness marketplace;
 
     error UnsupportedAssetType(uint256 _assetType);
     error InvalidFingerprint();
+    error NotCreator();
 
     function setUp() public {
         string memory rpcUrl = "https://rpc.decentraland.org/polygon";
@@ -186,263 +189,293 @@ contract PolygonMarketplaceTest is Test {
         assertEq(mana.balanceOf(dao), daoBalance + 0.3 ether);
     }
 
-    
+    function test_accept_mintItem_receiveMANA() public {
+        IERC20 mana = IERC20(0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4);
+        ICollection collection = ICollection(0x05267a0E08C9B756a000362d2B2c7E3ce29E740D);
+        uint256 itemId = 0;
 
-    // function test_accept_sendEstate_receiveMANA() public {
-    //     IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
-    //     IComposableERC721 estate = IComposableERC721(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
-    //     uint256 estateId = 5668;
+        {
+            address originalCollectionCreator = 0x9B3ae2dD9EAAD174cF5700420D4861A5a73a2d2A;
+            address originalManaHolder = 0x673e6B75a58354919FF5db539AA426727B385D17;
 
-    //     {
-    //         address originalEstateOwner = 0x877a61D298eAf59f6d574e089216aC764ec00D2D;
-    //         address originalManaHolder = 0x46f80018211D5cBBc988e853A8683501FCA4ee9b;
+            vm.prank(originalCollectionCreator);
+            collection.transferCreatorship(signer.addr);
 
-    //         vm.prank(originalEstateOwner);
-    //         estate.transferFrom(originalEstateOwner, signer.addr, estateId);
+            address[] memory _minters = new address[](1);
+            _minters[0] = address(marketplace);
 
-    //         vm.prank(originalManaHolder);
-    //         mana.transfer(caller, 1 ether);
+            bool[] memory _values = new bool[](1);
+            _values[0] = true;
 
-    //         vm.prank(signer.addr);
-    //         estate.setApprovalForAll(address(marketplace), true);
+            vm.prank(signer.addr);
+            collection.setMinters(_minters, _values);
 
-    //         vm.prank(caller);
-    //         mana.approve(address(marketplace), 1 ether);
+            vm.prank(originalManaHolder);
+            mana.transfer(caller, 1 ether);
 
-    //         assertEq(estate.ownerOf(estateId), signer.addr);
-    //         assertEq(mana.balanceOf(caller), 1 ether);
-    //     }
+            vm.prank(caller);
+            mana.approve(address(marketplace), 1 ether);
 
-    //     MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+            assertEq(collection.creator(), signer.addr);
+            assertEq(mana.balanceOf(caller), 1 ether);
+        }
 
-    //     {
-    //         trades[0].expiration = block.timestamp;
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
-    //         trades[0].sent = new MarketplaceHarness.Asset[](1);
+        {
+            trades[0].expiration = block.timestamp;
 
-    //         trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
-    //         trades[0].sent[0].contractAddress = address(estate);
-    //         trades[0].sent[0].value = estateId;
-    //         trades[0].sent[0].extra = abi.encode(estate.getFingerprint(estateId), bytes(""));
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+            trades[0].sent[0].assetType = marketplace.COLLECTION_ITEM_ID();
+            trades[0].sent[0].contractAddress = address(collection);
+            trades[0].sent[0].value = itemId;
 
-    //         trades[0].received = new MarketplaceHarness.Asset[](1);
+            trades[0].received = new MarketplaceHarness.Asset[](1);
+            trades[0].received[0].assetType = marketplace.ERC20_ID();
+            trades[0].received[0].contractAddress = address(mana);
+            trades[0].received[0].value = 1 ether;
 
-    //         trades[0].received[0].assetType = marketplace.ERC20_ID();
-    //         trades[0].received[0].contractAddress = address(mana);
-    //         trades[0].received[0].value = 1 ether;
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-    //         (uint8 v, bytes32 r, bytes32 s) =
-    //             vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
 
-    //         trades[0].signer = signer.addr;
-    //         trades[0].signature = abi.encodePacked(r, s, v);
-    //     }
+        vm.prank(caller);
+        marketplace.accept(trades);
 
-    //     vm.prank(caller);
-    //     marketplace.accept(trades);
+        assertEq(collection.ownerOf(1), caller);
+        assertEq(mana.balanceOf(signer.addr), 1 ether);
+    }
 
-    //     assertEq(estate.ownerOf(estateId), caller);
-    //     assertEq(mana.balanceOf(signer.addr), 1 ether);
-    // }
+    function test_accept_mintItem_receiveMANA_TradeHas2Uses_CanBeMintedTwice() public {
+        IERC20 mana = IERC20(0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4);
+        ICollection collection = ICollection(0x05267a0E08C9B756a000362d2B2c7E3ce29E740D);
+        uint256 itemId = 0;
 
-    // function test_accept_sendEstate_receiveMANA_RevertsIfFingerprintIsInvalid() public {
-    //     IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
-    //     IComposableERC721 estate = IComposableERC721(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
-    //     uint256 estateId = 5668;
+        {
+            address originalCollectionCreator = 0x9B3ae2dD9EAAD174cF5700420D4861A5a73a2d2A;
+            address originalManaHolder = 0x673e6B75a58354919FF5db539AA426727B385D17;
 
-    //     {
-    //         address originalEstateOwner = 0x877a61D298eAf59f6d574e089216aC764ec00D2D;
-    //         address originalManaHolder = 0x46f80018211D5cBBc988e853A8683501FCA4ee9b;
+            vm.prank(originalCollectionCreator);
+            collection.transferCreatorship(signer.addr);
 
-    //         vm.prank(originalEstateOwner);
-    //         estate.transferFrom(originalEstateOwner, signer.addr, estateId);
+            address[] memory _minters = new address[](1);
+            _minters[0] = address(marketplace);
 
-    //         vm.prank(originalManaHolder);
-    //         mana.transfer(caller, 1 ether);
+            bool[] memory _values = new bool[](1);
+            _values[0] = true;
 
-    //         vm.prank(signer.addr);
-    //         estate.setApprovalForAll(address(marketplace), true);
+            vm.prank(signer.addr);
+            collection.setMinters(_minters, _values);
 
-    //         vm.prank(caller);
-    //         mana.approve(address(marketplace), 1 ether);
+            vm.prank(originalManaHolder);
+            mana.transfer(caller, 2 ether);
 
-    //         assertEq(estate.ownerOf(estateId), signer.addr);
-    //         assertEq(mana.balanceOf(caller), 1 ether);
-    //     }
+            vm.prank(caller);
+            mana.approve(address(marketplace), 2 ether);
 
-    //     MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+            assertEq(collection.creator(), signer.addr);
+            assertEq(mana.balanceOf(caller), 2 ether);
+        }
 
-    //     {
-    //         trades[0].expiration = block.timestamp;
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
-    //         trades[0].sent = new MarketplaceHarness.Asset[](1);
+        {
+            trades[0].expiration = block.timestamp;
+            trades[0].uses = 2;
 
-    //         trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
-    //         trades[0].sent[0].contractAddress = address(estate);
-    //         trades[0].sent[0].value = estateId;
-    //         trades[0].sent[0].extra = abi.encode(bytes32(uint256(123)), bytes(""));
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+            trades[0].sent[0].assetType = marketplace.COLLECTION_ITEM_ID();
+            trades[0].sent[0].contractAddress = address(collection);
+            trades[0].sent[0].value = itemId;
 
-    //         trades[0].received = new MarketplaceHarness.Asset[](1);
+            trades[0].received = new MarketplaceHarness.Asset[](1);
+            trades[0].received[0].assetType = marketplace.ERC20_ID();
+            trades[0].received[0].contractAddress = address(mana);
+            trades[0].received[0].value = 1 ether;
 
-    //         trades[0].received[0].assetType = marketplace.ERC20_ID();
-    //         trades[0].received[0].contractAddress = address(mana);
-    //         trades[0].received[0].value = 1 ether;
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-    //         (uint8 v, bytes32 r, bytes32 s) =
-    //             vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
 
-    //         trades[0].signer = signer.addr;
-    //         trades[0].signature = abi.encodePacked(r, s, v);
-    //     }
+        vm.expectRevert();
+        collection.ownerOf(1);
 
-    //     vm.prank(caller);
-    //     vm.expectRevert(InvalidFingerprint.selector);
-    //     marketplace.accept(trades);
-    // }
+        vm.prank(caller);
+        marketplace.accept(trades);
 
-    // function test_accept_sendName_receiveMANA() public {
-    //     IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
-    //     IERC721 registrar = IERC721(0x2A187453064356c898cAe034EAed119E1663ACb8);
-    //     uint256 nameId = 111953866685194181316179970749576144183152508562302674483221441304598033207711;
+        assertEq(collection.ownerOf(1), caller);
+        vm.expectRevert();
+        collection.ownerOf(2);
+        assertEq(mana.balanceOf(caller), 1 ether);
+        assertEq(mana.balanceOf(signer.addr), 1 ether);
 
-    //     {
-    //         address originalNameOwner = 0x6a45De91B516C17CacEC184506d719947613465E;
-    //         address originalManaHolder = 0x46f80018211D5cBBc988e853A8683501FCA4ee9b;
+        vm.prank(caller);
+        marketplace.accept(trades);
 
-    //         vm.prank(originalNameOwner);
-    //         registrar.transferFrom(originalNameOwner, signer.addr, nameId);
+        assertEq(collection.ownerOf(1), caller);
+        assertEq(collection.ownerOf(2), caller);
+        assertEq(mana.balanceOf(caller), 0);
+        assertEq(mana.balanceOf(signer.addr), 2 ether);
+    }
 
-    //         vm.prank(originalManaHolder);
-    //         mana.transfer(caller, 1 ether);
+    function test_accept_mintItem_receiveMANA_RevertsIfSignerNorCalletIsTheCreator() public {
+        ICollection collection = ICollection(0x05267a0E08C9B756a000362d2B2c7E3ce29E740D);
+        uint256 itemId = 0;
 
-    //         vm.prank(signer.addr);
-    //         registrar.setApprovalForAll(address(marketplace), true);
+        {
+            address originalCollectionCreator = 0x9B3ae2dD9EAAD174cF5700420D4861A5a73a2d2A;
 
-    //         vm.prank(caller);
-    //         mana.approve(address(marketplace), 1 ether);
+            address[] memory _minters = new address[](1);
+            _minters[0] = address(marketplace);
 
-    //         assertEq(registrar.ownerOf(nameId), signer.addr);
-    //         assertEq(mana.balanceOf(caller), 1 ether);
-    //     }
+            bool[] memory _values = new bool[](1);
+            _values[0] = true;
 
-    //     MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+            vm.prank(originalCollectionCreator);
+            collection.setMinters(_minters, _values);
+        }
 
-    //     {
-    //         trades[0].expiration = block.timestamp;
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
-    //         trades[0].sent = new MarketplaceHarness.Asset[](1);
+        {
+            trades[0].expiration = block.timestamp;
 
-    //         trades[0].sent[0].assetType = marketplace.ERC721_ID();
-    //         trades[0].sent[0].contractAddress = address(registrar);
-    //         trades[0].sent[0].value = nameId;
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+            trades[0].sent[0].assetType = marketplace.COLLECTION_ITEM_ID();
+            trades[0].sent[0].contractAddress = address(collection);
+            trades[0].sent[0].value = itemId;
 
-    //         trades[0].received = new MarketplaceHarness.Asset[](1);
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-    //         trades[0].received[0].assetType = marketplace.ERC20_ID();
-    //         trades[0].received[0].contractAddress = address(mana);
-    //         trades[0].received[0].value = 1 ether;
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
 
-    //         (uint8 v, bytes32 r, bytes32 s) =
-    //             vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+        vm.prank(caller);
+        vm.expectRevert(NotCreator.selector);
+        marketplace.accept(trades);
+    }
 
-    //         trades[0].signer = signer.addr;
-    //         trades[0].signature = abi.encodePacked(r, s, v);
-    //     }
+    function test_accept_sendMANA_mintItem() public {
+        IERC20 mana = IERC20(0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4);
+        ICollection collection = ICollection(0x05267a0E08C9B756a000362d2B2c7E3ce29E740D);
+        uint256 itemId = 0;
 
-    //     vm.prank(caller);
-    //     marketplace.accept(trades);
+        {
+            address originalCollectionCreator = 0x9B3ae2dD9EAAD174cF5700420D4861A5a73a2d2A;
+            address originalManaHolder = 0x673e6B75a58354919FF5db539AA426727B385D17;
 
-    //     assertEq(registrar.ownerOf(nameId), caller);
-    //     assertEq(mana.balanceOf(signer.addr), 1 ether);
-    // }
+            vm.prank(originalCollectionCreator);
+            collection.transferCreatorship(caller);
 
-    // function test_accept_sendNameLANDAndEstate_receiveMANA() public {
-    //     IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+            address[] memory _minters = new address[](1);
+            _minters[0] = address(marketplace);
 
-    //     IERC721 land = IERC721(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d);
-    //     uint256 landId = 20416942015256307807802476445906092687221;
+            bool[] memory _values = new bool[](1);
+            _values[0] = true;
 
-    //     IComposableERC721 estate = IComposableERC721(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
-    //     uint256 estateId = 5668;
+            vm.prank(caller);
+            collection.setMinters(_minters, _values);
 
-    //     IERC721 registrar = IERC721(0x2A187453064356c898cAe034EAed119E1663ACb8);
-    //     uint256 nameId = 111953866685194181316179970749576144183152508562302674483221441304598033207711;
+            vm.prank(originalManaHolder);
+            mana.transfer(signer.addr, 1 ether);
 
-    //     {
-    //         address originalLandOwner = 0x9cbe520Aa4bFD545109026Bb1fdf9Ea54f476e5E;
-    //         address originalEstateOwner = 0x877a61D298eAf59f6d574e089216aC764ec00D2D;
-    //         address originalNameOwner = 0x6a45De91B516C17CacEC184506d719947613465E;
-    //         address originalManaHolder = 0x46f80018211D5cBBc988e853A8683501FCA4ee9b;
+            vm.prank(signer.addr);
+            mana.approve(address(marketplace), 1 ether);
 
-    //         vm.prank(originalLandOwner);
-    //         land.transferFrom(originalLandOwner, signer.addr, landId);
+            assertEq(collection.creator(), caller);
+            assertEq(mana.balanceOf(signer.addr), 1 ether);
+        }
 
-    //         vm.prank(originalEstateOwner);
-    //         estate.transferFrom(originalEstateOwner, signer.addr, estateId);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
-    //         vm.prank(originalNameOwner);
-    //         registrar.transferFrom(originalNameOwner, signer.addr, nameId);
+        {
+            trades[0].expiration = block.timestamp;
 
-    //         vm.prank(originalManaHolder);
-    //         mana.transfer(caller, 1 ether);
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+            trades[0].sent[0].assetType = marketplace.ERC20_ID();
+            trades[0].sent[0].contractAddress = address(mana);
+            trades[0].sent[0].value = 1 ether;
 
-    //         vm.prank(signer.addr);
-    //         land.setApprovalForAll(address(marketplace), true);
+            trades[0].received = new MarketplaceHarness.Asset[](1);
+            trades[0].received[0].assetType = marketplace.COLLECTION_ITEM_ID();
+            trades[0].received[0].contractAddress = address(collection);
+            trades[0].received[0].value = itemId;
 
-    //         vm.prank(signer.addr);
-    //         estate.setApprovalForAll(address(marketplace), true);
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
 
-    //         vm.prank(signer.addr);
-    //         registrar.setApprovalForAll(address(marketplace), true);
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
 
-    //         vm.prank(caller);
-    //         mana.approve(address(marketplace), 1 ether);
+        vm.prank(caller);
+        marketplace.accept(trades);
 
-    //         assertEq(land.ownerOf(landId), signer.addr);
-    //         assertEq(estate.ownerOf(estateId), signer.addr);
-    //         assertEq(registrar.ownerOf(nameId), signer.addr);
-    //         assertEq(mana.balanceOf(caller), 1 ether);
-    //     }
+        assertEq(collection.ownerOf(1), signer.addr);
+        assertEq(mana.balanceOf(caller), 1 ether);
+        assertEq(mana.balanceOf(signer.addr), 0);
+    }
 
-    //     MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+    function test_accept_sendMANA_mintItem_RevertsIfSignerNorCalletIsTheCreator() public {
+        IERC20 mana = IERC20(0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4);
+        ICollection collection = ICollection(0x05267a0E08C9B756a000362d2B2c7E3ce29E740D);
+        uint256 itemId = 0;
 
-    //     {
-    //         trades[0].expiration = block.timestamp;
+        {
+            address originalCollectionCreator = 0x9B3ae2dD9EAAD174cF5700420D4861A5a73a2d2A;
+            address originalManaHolder = 0x673e6B75a58354919FF5db539AA426727B385D17;
 
-    //         trades[0].sent = new MarketplaceHarness.Asset[](3);
+            address[] memory _minters = new address[](1);
+            _minters[0] = address(marketplace);
 
-    //         trades[0].sent[0].assetType = marketplace.ERC721_ID();
-    //         trades[0].sent[0].contractAddress = address(land);
-    //         trades[0].sent[0].value = landId;
+            bool[] memory _values = new bool[](1);
+            _values[0] = true;
 
-    //         trades[0].sent[1].assetType = marketplace.COMPOSABLE_ERC721_ID();
-    //         trades[0].sent[1].contractAddress = address(estate);
-    //         trades[0].sent[1].value = estateId;
-    //         trades[0].sent[1].extra = abi.encode(estate.getFingerprint(estateId), bytes(""));
+            vm.prank(originalCollectionCreator);
+            collection.setMinters(_minters, _values);
 
-    //         trades[0].sent[2].assetType = marketplace.ERC721_ID();
-    //         trades[0].sent[2].contractAddress = address(registrar);
-    //         trades[0].sent[2].value = nameId;
+            vm.prank(originalManaHolder);
+            mana.transfer(signer.addr, 1 ether);
 
-    //         trades[0].received = new MarketplaceHarness.Asset[](1);
+            vm.prank(signer.addr);
+            mana.approve(address(marketplace), 1 ether);
 
-    //         trades[0].received[0].assetType = marketplace.ERC20_ID();
-    //         trades[0].received[0].contractAddress = address(mana);
-    //         trades[0].received[0].value = 1 ether;
+            assertEq(collection.creator(), originalCollectionCreator);
+            assertEq(mana.balanceOf(signer.addr), 1 ether);
+        }
 
-    //         (uint8 v, bytes32 r, bytes32 s) =
-    //             vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
-    //         trades[0].signer = signer.addr;
-    //         trades[0].signature = abi.encodePacked(r, s, v);
-    //     }
+        {
+            trades[0].expiration = block.timestamp;
 
-    //     vm.prank(caller);
-    //     marketplace.accept(trades);
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+            trades[0].sent[0].assetType = marketplace.ERC20_ID();
+            trades[0].sent[0].contractAddress = address(mana);
+            trades[0].sent[0].value = 1 ether;
 
-    //     assertEq(land.ownerOf(landId), caller);
-    //     assertEq(estate.ownerOf(estateId), caller);
-    //     assertEq(registrar.ownerOf(nameId), caller);
-    //     assertEq(mana.balanceOf(signer.addr), 1 ether);
-    // }
+            trades[0].received = new MarketplaceHarness.Asset[](1);
+            trades[0].received[0].assetType = marketplace.COLLECTION_ITEM_ID();
+            trades[0].received[0].contractAddress = address(collection);
+            trades[0].received[0].value = itemId;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(caller);
+        vm.expectRevert(NotCreator.selector);
+        marketplace.accept(trades);
+    }
 }

@@ -13,7 +13,7 @@ abstract contract CollectionItemTransfer is Context {
 
         address creator = collection.creator();
 
-        if (creator != _signer || creator != _msgSender()) {
+        if (creator != _signer && creator != _msgSender()) {
             revert NotCreator();
         }
 
