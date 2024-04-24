@@ -226,7 +226,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
             uint256 newStoredSignatureUses = storedSinatureUses + 1;
 
-            signatureUses[hashedSignature] = foo;
+            signatureUses[hashedSignature] = newStoredSignatureUses;
 
             if (newStoredSignatureUses == trade.uses) {
                 usedTradeIds[tradeId] = true;
