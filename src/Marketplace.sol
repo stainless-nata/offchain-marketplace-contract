@@ -171,7 +171,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 revert CancelledSignature();
             }
 
-            if (trade.uses > 0 && signatureUses[hashedSignature] >= trade.uses) {
+            uint256 storedSinatureUses = signatureUses[hashedSignature];
+
+            if (trade.uses > 0 && storedSinatureUses >= trade.uses) {
                 revert SignatureReuse();
             }
 
@@ -222,9 +224,11 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
             _verifyTradeSignature(trade, signer);
 
-            signatureUses[hashedSignature]++;
+            uint256 newStoredSignatureUses = storedSinatureUses + 1;
 
-            if (signatureUses[hashedSignature] == trade.uses) {
+            signatureUses[hashedSignature] = foo;
+
+            if (newStoredSignatureUses == trade.uses) {
                 usedTradeIds[tradeId] = true;
             }
 
