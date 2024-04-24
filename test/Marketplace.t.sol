@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Test} from "lib/forge-std/src/Test.sol";
+import {Test, console} from "lib/forge-std/src/Test.sol";
 import {VmSafe} from "lib/forge-std/src/Vm.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {ERC1271WalletMock} from "lib/openzeppelin-contracts/contracts/mocks/ERC1271WalletMock.sol";
@@ -148,20 +148,20 @@ contract MarketplaceTest is Test {
 
     // Marketplace
 
-    event ContractSignatureIndexIncreased(uint256, address);
-    event SignerSignatureIndexIncreased(uint256, address);
-    event Traded();
+    event ContractSignatureIndexIncreased(uint256 _to, address _by);
+    event SignerSignatureIndexIncreased(uint256 _to, address _by);
     event SignatureCancelled();
+    event Traded();
 
+    error CancelledSignature();
+    error SignatureReuse();
+    error UsedTradeId();
+    error NotEffective();
     error InvalidContractSignatureIndex();
     error InvalidSignerSignatureIndex();
     error Expired();
     error NotAllowed();
-    error ECDSAInvalidSignatureLength(uint256);
     error InvalidSignature();
-    error SignatureReuse();
-    error CancelledSignature();
-    error NotEffective();
 
     // increaseContractSignatureIndex
 
@@ -217,7 +217,7 @@ contract MarketplaceTest is Test {
         marketplace.cancelSignature(trades);
     }
 
-    function test_cancelSignature_CancelledSignature() public {
+    function test_cancelSignature_SignatureCancelled() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         (uint8 v, bytes32 r, bytes32 s) =
