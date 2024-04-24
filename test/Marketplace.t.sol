@@ -377,6 +377,35 @@ contract MarketplaceTest is Test {
         marketplace.accept(trades);
     }
 
+
+        function test_accept_Traded_ManyAllowed() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+        trades[0].allowed = new address[](10);
+        trades[0].allowed[0] = caller1;
+        trades[0].allowed[1] = caller2;
+        trades[0].allowed[2] = vm.addr(0x4);
+        trades[0].allowed[3] = vm.addr(0x5);
+        trades[0].allowed[4] = vm.addr(0x6);
+        trades[0].allowed[5] = vm.addr(0x7);
+        trades[0].allowed[6] = vm.addr(0x8);
+        trades[0].allowed[7] = vm.addr(0x9);
+        trades[0].allowed[8] = vm.addr(0xa);
+        trades[0].allowed[9] = vm.addr(0xb);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+        trades[0].signer = signer1.addr;
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(vm.addr(0xb));
+        vm.expectEmit(address(marketplace));
+        emit Traded();
+        marketplace.accept(trades);
+    }
+    
     // accept - Sent asset beneficiary
 
     function test_accept_AllowsSentAssetBeneficiaryToBeChanged() public {

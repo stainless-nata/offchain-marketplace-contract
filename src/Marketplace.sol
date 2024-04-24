@@ -42,16 +42,16 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     ///
     /// This allows connecting Trades, allowing a way in which after one Trade is accepted, all those related Trades can be automatically invalidated.
     ///
-    /// For example: 
-    /// 
+    /// For example:
+    ///
     /// User A wants to make an Auction to sell Asset A
-    /// 
+    ///
     /// User B signs a Trade to buy Asset A from User A for 100 DAI
     /// User C signs a Trade to buy Asset A from User A for 200 DAI
     /// User D signs a Trade to buy Asset A from User A for 300 DAI (All these use the same salt)
-    /// 
+    ///
     /// User A accepts the Trade from User D
-    /// 
+    ///
     /// The Trades signed by User B and User C are automatically invalidated, and User A can't accept them anymore.
     ///
     /// NOTE: To make the best use out of this feature, it is recommended to set only the address of the user that can accept the Trade in the allowed field.
@@ -176,7 +176,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             }
 
             address caller = _msgSender();
-            
+
             bytes32 tradeId = _tradeId(trade, caller);
 
             if (usedTradeIds[tradeId]) {
@@ -201,11 +201,15 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 revert Expired();
             }
 
-            if (trade.allowed.length > 0) {
+            address[] memory allowed = trade.allowed;
+            
+            uint256 allowedLength = trade.allowed.length;
+
+            if (allowedLength > 0) {
                 bool isAllowed = false;
 
-                for (uint256 j = 0; j < trade.allowed.length; j++) {
-                    if (trade.allowed[j] == caller) {
+                for (uint256 j = 0; j < allowedLength; j++) {
+                    if (allowed[j] == caller) {
                         isAllowed = true;
                         break;
                     }
