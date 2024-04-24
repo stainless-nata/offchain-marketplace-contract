@@ -36,7 +36,7 @@ contract MarketplaceTest is Test {
 
     function setUp() public {
         owner = vm.addr(0x1);
-        
+
         caller1 = vm.addr(0x2);
         caller2 = vm.addr(0x3);
 
@@ -241,6 +241,8 @@ contract MarketplaceTest is Test {
 
     // accept
 
+    // accept - Checks
+
     function test_accept_RevertIfPaused() public {
         vm.prank(owner);
         marketplace.pause();
@@ -257,6 +259,16 @@ contract MarketplaceTest is Test {
 
         vm.prank(caller1);
         vm.expectRevert(InvalidContractSignatureIndex.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertIfInvalidSignerSignatureIndex() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].signerSignatureIndex = 1;
+
+        vm.prank(caller1);
+        vm.expectRevert(InvalidSignerSignatureIndex.selector);
         marketplace.accept(trades);
     }
 
@@ -286,16 +298,6 @@ contract MarketplaceTest is Test {
 
         vm.prank(caller1);
         vm.expectRevert(NotEffective.selector);
-        marketplace.accept(trades);
-    }
-
-    function test_accept_RevertIfInvalidSignerSignatureIndex() public {
-        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
-
-        trades[0].signerSignatureIndex = 1;
-
-        vm.prank(caller1);
-        vm.expectRevert(InvalidSignerSignatureIndex.selector);
         marketplace.accept(trades);
     }
 
@@ -336,6 +338,28 @@ contract MarketplaceTest is Test {
         marketplace.accept(trades);
     }
 
+    function test_accept_RevertIfSignatureIsResused() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+        trades[0].uses = 1;
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+        trades[0].signer = signer1.addr;
+        trades[0].signature = abi.encodePacked(r, s, v);
+
+        vm.prank(caller1);
+        marketplace.accept(trades);
+
+        vm.prank(caller1);
+        vm.expectRevert(SignatureReuse.selector);
+        marketplace.accept(trades);
+    }
+
+    // accept - Success
+
     function test_accept_Traded() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
@@ -353,7 +377,9 @@ contract MarketplaceTest is Test {
         marketplace.accept(trades);
     }
 
-    function test_accept_AssetBeneficiaryIsChanged() public {
+    // accept - Sent asset beneficiary
+
+    function test_accept_AllowsSentAssetBeneficiaryToBeChanged() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].expiration = block.timestamp;
@@ -396,25 +422,7 @@ contract MarketplaceTest is Test {
         marketplace.accept(trades);
     }
 
-    function test_accept_RevertIfSignatureIsResused() public {
-        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
-
-        trades[0].expiration = block.timestamp;
-        trades[0].uses = 1;
-
-        (uint8 v, bytes32 r, bytes32 s) =
-            vm.sign(signer1.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
-
-        trades[0].signer = signer1.addr;
-        trades[0].signature = abi.encodePacked(r, s, v);
-
-        vm.prank(caller1);
-        marketplace.accept(trades);
-
-        vm.prank(caller1);
-        vm.expectRevert(SignatureReuse.selector);
-        marketplace.accept(trades);
-    }
+    // accept - ERC1271
 
     function test_accept_RevertIfERC1271VerificationFails() public {
         ERC1271WalletMock wallet = new ERC1271WalletMock(caller1);
@@ -450,6 +458,8 @@ contract MarketplaceTest is Test {
         vm.prank(caller1);
         marketplace.accept(trades);
     }
+
+    // accept - Trade ID
 
     function test_accept_RevertsIfTradeIdIsReused() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
