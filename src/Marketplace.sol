@@ -102,9 +102,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         Asset[] received;
     }
 
-    event ContractSignatureIndexIncreased(uint256 _to, address _by);
-    event SignerSignatureIndexIncreased(uint256 _to, address _by);
-    event SignatureCancelled();
+    event ContractSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
+    event SignerSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
+    event SignatureCancelled(address indexed _caller, bytes32 indexed _hashedSignature, bytes _signature);
     event Traded();
 
     error CancelledSignature();
@@ -133,7 +133,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     function increaseContractSignatureIndex() external onlyOwner {
         uint256 newIndex = ++contractSignatureIndex;
 
-        emit ContractSignatureIndexIncreased(newIndex, _msgSender());
+        emit ContractSignatureIndexIncreased(_msgSender(), newIndex);
     }
 
     /// @notice Any user can increase their signer signature index to invalidate all Trades signed with a lower index.
@@ -142,20 +142,26 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
         uint256 newIndex = ++signerSignatureIndex[caller];
 
-        emit SignerSignatureIndexIncreased(newIndex, caller);
+        emit SignerSignatureIndexIncreased(caller, newIndex);
     }
 
     /// @notice Signers can cancel their Trade signatured to prevent them from being used.
     /// @param _trades - An array of Trades to be cancelled.
     function cancelSignature(Trade[] calldata _trades) external {
+        address caller = _msgSender();
+
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
 
-            _verifyTradeSignature(trade, _msgSender());
+            _verifyTradeSignature(trade, caller);
 
-            cancelledSignatures[keccak256(trade.signature)] = true;
+            bytes memory signature = trade.signature;
 
-            emit SignatureCancelled();
+            bytes32 hashedSignature = keccak256(signature);
+
+            cancelledSignatures[hashedSignature] = true;
+
+            emit SignatureCancelled(caller, hashedSignature, signature);
         }
     }
 

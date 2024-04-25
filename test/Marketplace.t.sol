@@ -155,9 +155,9 @@ contract MarketplaceTest is Test {
 
     // Marketplace
 
-    event ContractSignatureIndexIncreased(uint256 _to, address _by);
-    event SignerSignatureIndexIncreased(uint256 _to, address _by);
-    event SignatureCancelled();
+    event ContractSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
+    event SignerSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
+    event SignatureCancelled(address indexed _caller, bytes32 indexed _hashedSignature, bytes _signature);
     event Traded();
 
     error CancelledSignature();
@@ -183,7 +183,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(owner);
         vm.expectEmit(address(marketplace));
-        emit ContractSignatureIndexIncreased(1, owner);
+        emit ContractSignatureIndexIncreased(owner, 1);
         marketplace.increaseContractSignatureIndex();
         assertEq(marketplace.contractSignatureIndex(), 1);
     }
@@ -195,7 +195,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(owner);
         vm.expectEmit(address(marketplace));
-        emit SignerSignatureIndexIncreased(1, owner);
+        emit SignerSignatureIndexIncreased(owner, 1);
         marketplace.increaseSignerSignatureIndex();
         assertEq(marketplace.signerSignatureIndex(owner), 1);
 
@@ -203,7 +203,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(caller1);
         vm.expectEmit(address(marketplace));
-        emit SignerSignatureIndexIncreased(1, caller1);
+        emit SignerSignatureIndexIncreased(caller1, 1);
         marketplace.increaseSignerSignatureIndex();
         assertEq(marketplace.signerSignatureIndex(caller1), 1);
     }
@@ -235,7 +235,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(signer1.addr);
         vm.expectEmit(address(marketplace));
-        emit SignatureCancelled();
+        emit SignatureCancelled(signer1.addr, keccak256(trades[0].signature), trades[0].signature);
         marketplace.cancelSignature(trades);
     }
 
