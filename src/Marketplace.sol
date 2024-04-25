@@ -168,6 +168,8 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @notice Accepts a Trade if all checks are valid.
     /// @param _trades - An array of Trades to be accepted.
     function accept(Trade[] calldata _trades) external whenNotPaused nonReentrant {
+        address caller = _msgSender();
+        
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
 
@@ -182,8 +184,6 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             if (trade.uses > 0 && storedSinatureUses >= trade.uses) {
                 revert SignatureReuse();
             }
-
-            address caller = _msgSender();
 
             bytes32 tradeId = _tradeId(trade, caller);
 
