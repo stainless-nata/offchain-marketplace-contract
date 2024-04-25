@@ -169,7 +169,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @param _trades - An array of Trades to be accepted.
     function accept(Trade[] calldata _trades) external whenNotPaused nonReentrant {
         address caller = _msgSender();
-        
+
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
 
@@ -210,7 +210,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             }
 
             address[] memory allowed = trade.allowed;
-            
+
             uint256 allowedLength = trade.allowed.length;
 
             if (allowedLength > 0) {
