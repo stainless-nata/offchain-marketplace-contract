@@ -131,18 +131,18 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
     /// @notice The owner can increase the contract signature index to invalidate all Trades signed with a lower index.
     function increaseContractSignatureIndex() external onlyOwner {
-        contractSignatureIndex++;
+        uint256 newIndex = ++contractSignatureIndex;
 
-        emit ContractSignatureIndexIncreased(contractSignatureIndex, _msgSender());
+        emit ContractSignatureIndexIncreased(newIndex, _msgSender());
     }
 
     /// @notice Any user can increase their signer signature index to invalidate all Trades signed with a lower index.
     function increaseSignerSignatureIndex() external {
         address caller = _msgSender();
 
-        signerSignatureIndex[caller]++;
+        uint256 newIndex = ++signerSignatureIndex[caller];
 
-        emit SignerSignatureIndexIncreased(signerSignatureIndex[caller], caller);
+        emit SignerSignatureIndexIncreased(newIndex, caller);
     }
 
     /// @notice Signers can cancel their Trade signatured to prevent them from being used.
