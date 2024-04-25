@@ -117,7 +117,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     error NotAllowed();
     error InvalidSignature();
 
-    constructor(address _owner) EIP712("Marketplace", "0.0.1") Ownable(_owner) {}
+    constructor(address _owner) EIP712("Marketplace", "1.0.0") Ownable(_owner) {}
 
     /// @notice The owner can pause the contract to prevent some external functions from being called.
     function pause() external onlyOwner {

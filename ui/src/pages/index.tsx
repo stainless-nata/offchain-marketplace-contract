@@ -35,7 +35,7 @@ export default function Home() {
     const signature = await signer.signTypedData(
       {
         name: "Marketplace",
-        version: "0.0.1",
+        version: "1.0.0",
         verifyingContract: contractAddress,
         salt,
       },
