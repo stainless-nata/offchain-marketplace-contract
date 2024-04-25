@@ -324,7 +324,7 @@ contract PolygonMarketplaceTest is Test {
         assertEq(mana.balanceOf(signer.addr), 2 ether);
     }
 
-    function test_accept_mintItem_receiveMANA_RevertsIfSignerNorCalletIsTheCreator() public {
+    function test_accept_mintItem_receiveMANA_RevertsIfSignerNorCallerIsTheCreator() public {
         ICollection collection = ICollection(0x05267a0E08C9B756a000362d2B2c7E3ce29E740D);
         uint256 itemId = 0;
 
@@ -424,7 +424,7 @@ contract PolygonMarketplaceTest is Test {
         assertEq(mana.balanceOf(signer.addr), 0);
     }
 
-    function test_accept_sendMANA_mintItem_RevertsIfSignerNorCalletIsTheCreator() public {
+    function test_accept_sendMANA_mintItem_RevertsIfSignerNorCallerIsTheCreator() public {
         IERC20 mana = IERC20(0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4);
         ICollection collection = ICollection(0x05267a0E08C9B756a000362d2B2c7E3ce29E740D);
         uint256 itemId = 0;
