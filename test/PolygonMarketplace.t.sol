@@ -8,6 +8,7 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
 import {ICollection} from "src/interfaces/ICollection.sol";
+import {NativeMetaTransaction} from "src/external/NativeMetaTransaction.sol";
 
 contract MarketplaceHarness is PolygonMarketplace {
     constructor(address _owner) PolygonMarketplace(_owner) {}
@@ -23,6 +24,7 @@ contract MarketplaceHarness is PolygonMarketplace {
 
 contract PolygonMarketplaceTest is Test {
     VmSafe.Wallet signer;
+    VmSafe.Wallet signer2;
 
     address caller;
 
@@ -40,6 +42,8 @@ contract PolygonMarketplaceTest is Test {
         vm.selectFork(forkId);
 
         signer = vm.createWallet("signer");
+        signer2 = vm.createWallet("signer2");
+
         caller = vm.addr(0xB0C4);
 
         address owner = vm.addr(0x1);
@@ -122,6 +126,88 @@ contract PolygonMarketplaceTest is Test {
         marketplace.accept(trades);
 
         assertEq(collection.ownerOf(tokenId), caller);
+        assertEq(mana.balanceOf(signer.addr), 1 ether);
+    }
+
+    function test_accept_sendWearable_receiveMANA_MetaTransaction() public {
+        IERC20 mana = IERC20(0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4);
+        IERC721 collection = IERC721(0x04e154dB53007bDfF215cc95b944018bBac81bc0);
+        uint256 tokenId = 8;
+
+        {
+            address originalNftOwner = 0xa6c6DC29B99E8e7c919a5d2Ea426874ad15eA0ed;
+            address originalManaHolder = 0x673e6B75a58354919FF5db539AA426727B385D17;
+
+            vm.prank(originalNftOwner);
+            collection.transferFrom(originalNftOwner, signer.addr, tokenId);
+
+            vm.prank(originalManaHolder);
+            mana.transfer(signer2.addr, 1 ether);
+
+            vm.prank(signer.addr);
+            collection.setApprovalForAll(address(marketplace), true);
+
+            vm.prank(signer2.addr);
+            mana.approve(address(marketplace), 1 ether);
+
+            assertEq(collection.ownerOf(tokenId), signer.addr);
+            assertEq(mana.balanceOf(signer2.addr), 1 ether);
+        }
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        {
+            trades[0].expiration = block.timestamp;
+
+            trades[0].sent = new MarketplaceHarness.Asset[](1);
+
+            trades[0].sent[0].assetType = marketplace.ERC721_ID();
+            trades[0].sent[0].contractAddress = address(collection);
+            trades[0].sent[0].value = tokenId;
+
+            trades[0].received = new MarketplaceHarness.Asset[](1);
+
+            trades[0].received[0].assetType = marketplace.ERC20_ID();
+            trades[0].received[0].contractAddress = address(mana);
+            trades[0].received[0].value = 1 ether;
+
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(signer.privateKey, MessageHashUtils.toTypedDataHash(marketplace.getDomainSeparator(), marketplace.hashTrade(trades[0])));
+
+            trades[0].signer = signer.addr;
+            trades[0].signature = abi.encodePacked(r, s, v);
+        }
+
+        NativeMetaTransaction.MetaTransaction memory metaTrx;
+        bytes memory metaTrxSignature;
+
+        {
+            metaTrx.nonce = 0;
+            metaTrx.from = signer2.addr;
+            metaTrx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                signer2.privateKey,
+                MessageHashUtils.toTypedDataHash(
+                    marketplace.getDomainSeparator(),
+                    keccak256(
+                        abi.encode(
+                            keccak256(bytes("MetaTransaction(uint256 nonce,address from,bytes functionData)")),
+                            metaTrx.nonce,
+                            metaTrx.from,
+                            keccak256(metaTrx.functionData)
+                        )
+                    )
+                )
+            );
+
+            metaTrxSignature = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(caller);
+        marketplace.executeMetaTransaction(metaTrx.from, metaTrx.functionData, metaTrxSignature);
+
+        assertEq(collection.ownerOf(tokenId), signer2.addr);
         assertEq(mana.balanceOf(signer.addr), 1 ether);
     }
 
