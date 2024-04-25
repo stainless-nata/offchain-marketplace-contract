@@ -105,7 +105,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     event ContractSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
     event SignerSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
     event SignatureCancelled(address indexed _caller, bytes32 indexed _signature);
-    event Traded();
+    event Traded(address indexed _caller, bytes32 indexed _signature);
 
     error CancelledSignature();
     error SignatureReuse();
@@ -236,7 +236,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 usedTradeIds[tradeId] = true;
             }
 
-            emit Traded();
+            emit Traded(caller, hashedSignature);
 
             _transferAssets(trade.sent, signer, caller, signer);
 

@@ -158,7 +158,7 @@ contract MarketplaceTest is Test {
     event ContractSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
     event SignerSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
     event SignatureCancelled(address indexed _caller, bytes32 indexed _signature);
-    event Traded();
+    event Traded(address indexed _caller, bytes32 indexed _signature);
 
     error CancelledSignature();
     error SignatureReuse();
@@ -373,7 +373,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(caller1);
         vm.expectEmit(address(marketplace));
-        emit Traded();
+        emit Traded(caller1, keccak256(trades[0].signature));
         marketplace.accept(trades);
     }
 
@@ -402,7 +402,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(vm.addr(0xb));
         vm.expectEmit(address(marketplace));
-        emit Traded();
+        emit Traded(vm.addr(0xb), keccak256(trades[0].signature));
         marketplace.accept(trades);
     }
     
@@ -426,7 +426,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(caller1);
         vm.expectEmit(address(marketplace));
-        emit Traded();
+        emit Traded(caller1, keccak256(trades[0].signature));
         marketplace.accept(trades);
     }
 
