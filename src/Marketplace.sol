@@ -75,14 +75,16 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @param assetType - The type of asset being traded. Useful for the implementation to know how to handle the asset.
     /// @param contractAddress - The address of the contract that holds the asset.
     /// @param value - Depends on the asset. It could be the amount for ERC20s or the tokenId for ERC721s.
-    /// @param extra - Extra data that the implementation might need to handle the asset. Like the data provided on an ERC721 safeTransferFrom calls.
     /// @param beneficiary - The address that will receive the asset. If the address is 0x0, the beneficiary will be the signer or the caller accordingly.
+    /// @param extra - Extra data that the implementation might need to handle the asset. Like the fingerprint on ComposableERC721 nfts.
+    /// @param unverifiedExtra - Extra data that is not included in the signature validation. Useful for data that is only important for the caller and not the signer.
     struct Asset {
         uint256 assetType;
         address contractAddress;
         uint256 value;
-        bytes extra;
         address beneficiary;
+        bytes extra;
+        bytes unverifiedExtra;
     }
 
     /// @dev Schema for an external check.

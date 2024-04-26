@@ -9,9 +9,10 @@ import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/crypt
 import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
 import {ICollection} from "src/interfaces/ICollection.sol";
 import {NativeMetaTransaction} from "src/external/NativeMetaTransaction.sol";
+import {ICollectionStore} from "src/interfaces/ICollectionStore.sol";
 
 contract MarketplaceHarness is PolygonMarketplace {
-    constructor(address _owner) PolygonMarketplace(_owner) {}
+    constructor(address _owner, ICollectionStore _collectionStore) PolygonMarketplace(_owner, _collectionStore) {}
 
     function getDomainSeparator() external view returns (bytes32) {
         return _domainSeparatorV4();
@@ -47,11 +48,12 @@ contract PolygonMarketplaceTest is Test {
         caller = vm.addr(0xB0C4);
 
         address owner = vm.addr(0x1);
-        marketplace = new MarketplaceHarness(owner);
+        ICollectionStore collectionStore = ICollectionStore(0x214ffC0f0103735728dc66b61A22e4F163e275ae);
+        marketplace = new MarketplaceHarness(owner, collectionStore);
     }
 
     function test_accept_RevertsIfUnsupportedAssetType() public {
-        uint256 assetType = 3;
+        uint256 assetType = 4;
 
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 

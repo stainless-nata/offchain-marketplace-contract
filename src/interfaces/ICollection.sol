@@ -8,6 +8,8 @@ interface ICollection is IERC721 {
 
     function creator() external view returns (address);
 
+    function items(uint256 _itemId) external view returns (string memory, uint256, uint256, uint256, address, string memory, string memory);
+
     function transferCreatorship(address _newCreator) external;
 
     function setMinters(address[] calldata _minters, bool[] calldata _values) external;
