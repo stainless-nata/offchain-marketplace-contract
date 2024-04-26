@@ -32,17 +32,24 @@ abstract contract CollectionItemTransfer is Context {
     error InvalidDiscountType();
 
     constructor(ICollectionStore _collectionStore) {
+        // See the _transferCollectionItemWithDiscount for more info about these values.
         collectionStoreErc20 = _collectionStore.acceptedToken();
         collectionStoreFeeRate = _collectionStore.fee();
         collectionStoreFeeRateBase = _collectionStore.BASE_FEE();
         collectionStoreFeeCollector = _collectionStore.feeOwner();
     }
 
+    /// @dev Issues a token from a collection to the beneficiary defined in the asset.
+    /// @param _asset - The asset that will be transferred.
+    /// @param _signer - The user that signed the Trade request that contains this asset.
     function _transferCollectionItem(Marketplace.Asset memory _asset, address _signer) internal {
         ICollection collection = ICollection(_asset.contractAddress);
 
         address creator = collection.creator();
 
+        // The creator of the collections has to be the signer or the caller in order for the Trade to succeed.
+        // This is because it is logical that the creator is the one that wants to sign a Trade request for one of their collection items.
+        // Also another user might offer a Trade request for a collection item, which the creator should be able to accept.
         if (creator != _signer && creator != _msgSender()) {
             revert NotCreator();
         }
@@ -56,6 +63,18 @@ abstract contract CollectionItemTransfer is Context {
         collection.issueTokens(beneficiaries, itemIds);
     }
 
+    /// @dev Allows creators to apply discounts to their collections.
+    /// The discount can be applied to all their collections, a specific collection, or a certain item.
+    /// The discount will be applied over the price defined on the collection item.
+    /// This function contains behavior similar to the one found on the `buy` function of the CollectionStore contract.
+    ///
+    /// https://polygonscan.com/address/0x214ffC0f0103735728dc66b61A22e4F163e275ae#code <- CollectionStore
+    ///
+    /// It will obtain the item price from the collection and apply the discount to it.
+    /// The same ERC20 token, and Fee parameters from the CollectionsStore contract are used.
+    ///
+    /// NOTE: The Asset that this function receives should come from the `sent` assets from the Trade.
+    /// If the asset comes from the received assets, the creator will be paid, but will receive the issued token as well.
     function _transferCollectionItemWithDiscount(Marketplace.Asset memory _asset, address _signer) internal {
         // Extract the item that the user wants to buy.
         (address contractAddress, uint256 itemId, uint256 price) = abi.decode(_asset.unverifiedExtra, (address, uint256, uint256));
