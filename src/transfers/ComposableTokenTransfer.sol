@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {IComposable} from "../interfaces/IComposable.sol";
 import {Marketplace} from "../Marketplace.sol";
 
-abstract contract ComposableERC721Transfer {
+abstract contract ComposableTokenTransfer {
     error InvalidFingerprint();
 
     function _transferComposableERC721(Marketplace.Asset memory _asset, address _from) internal {
