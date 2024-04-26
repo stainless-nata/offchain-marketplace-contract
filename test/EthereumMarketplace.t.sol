@@ -222,7 +222,7 @@ contract EthereumMarketplaceTest is Test {
             trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
             trades[0].sent[0].contractAddress = address(estate);
             trades[0].sent[0].value = estateId;
-            trades[0].sent[0].extra = abi.encode(estate.getFingerprint(estateId), bytes(""));
+            trades[0].sent[0].extra = abi.encode(estate.getFingerprint(estateId));
 
             trades[0].received = new MarketplaceHarness.Asset[](1);
 
@@ -279,7 +279,7 @@ contract EthereumMarketplaceTest is Test {
             trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
             trades[0].sent[0].contractAddress = address(estate);
             trades[0].sent[0].value = estateId;
-            trades[0].sent[0].extra = abi.encode(bytes32(uint256(123)), bytes(""));
+            trades[0].sent[0].extra = abi.encode(bytes32(uint256(123)));
 
             trades[0].received = new MarketplaceHarness.Asset[](1);
 
@@ -417,7 +417,7 @@ contract EthereumMarketplaceTest is Test {
             trades[0].sent[1].assetType = marketplace.COMPOSABLE_ERC721_ID();
             trades[0].sent[1].contractAddress = address(estate);
             trades[0].sent[1].value = estateId;
-            trades[0].sent[1].extra = abi.encode(estate.getFingerprint(estateId), bytes(""));
+            trades[0].sent[1].extra = abi.encode(estate.getFingerprint(estateId));
 
             trades[0].sent[2].assetType = marketplace.ERC721_ID();
             trades[0].sent[2].contractAddress = address(registrar);
