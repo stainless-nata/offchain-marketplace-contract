@@ -7,7 +7,7 @@ import {EthereumMarketplace} from "../src/EthereumMarketplace.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
-import {IComposableERC721} from "../src/interfaces/IComposableERC721.sol";
+import {IComposable} from "../src/interfaces/IComposable.sol";
 
 contract MarketplaceHarness is EthereumMarketplace {
     constructor(address _owner) EthereumMarketplace(_owner) {}
@@ -189,7 +189,7 @@ contract EthereumMarketplaceTest is Test {
 
     function test_accept_sendEstate_receiveMANA() public {
         IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
-        IComposableERC721 estate = IComposableERC721(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        IComposable estate = IComposable(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
         uint256 estateId = 5668;
 
         {
@@ -246,7 +246,7 @@ contract EthereumMarketplaceTest is Test {
 
     function test_accept_sendEstate_receiveMANA_RevertsIfFingerprintIsInvalid() public {
         IERC20 mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
-        IComposableERC721 estate = IComposableERC721(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        IComposable estate = IComposable(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
         uint256 estateId = 5668;
 
         {
@@ -361,7 +361,7 @@ contract EthereumMarketplaceTest is Test {
         IERC721 land = IERC721(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d);
         uint256 landId = 20416942015256307807802476445906092687221;
 
-        IComposableERC721 estate = IComposableERC721(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        IComposable estate = IComposable(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
         uint256 estateId = 5668;
 
         IERC721 registrar = IERC721(0x2A187453064356c898cAe034EAed119E1663ACb8);
