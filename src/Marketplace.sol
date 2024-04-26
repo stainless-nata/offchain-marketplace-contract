@@ -13,12 +13,21 @@ import {EIP712} from "./external/EIP712.sol";
 /// @notice Marketplace contract that allows the execution of signed Trades.
 /// Users can sign a Trade indicating which assets are to be traded. Another user can the accept the Trade using the signature, executing the exchange if all checks are valid.
 abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
+    /// @dev Type hashes for Trade signatures following the EIP712 standard.
+    /// keccak256("ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
+    bytes32 private constant EXTERNAL_CHECK_TYPE_HASH = 0xdf361982fbc6415130c9d78e2e25ec087cf4812d4c0714d41cc56537ee15ac24;
     /// keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
     bytes32 private constant ASSET_WO_BENEFICIARY_TYPE_HASH = 0x7be57332caf51c5f0f0fa0e7c362534d22d81c0bee1ffac9b573acd336e032bd;
     /// keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)")
     bytes32 private constant ASSET_TYPE_HASH = 0xe5f9e1ebc316d1bde562c77f47da7dc2cccb903eb04f9b82e29212b96f9e57e1;
-    /// keccak256("Trade(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
-    bytes32 private constant TRADE_TYPE_HASH = 0xb967bcaa9c7a374d193cf0f8af42cb15a1f51f6e94e22610b82c42c7cb93dd86;
+    /// keccak256("Trade(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
+    bytes32 private constant TRADE_TYPE_HASH = 0x3bf794c19d5d3d6a9c2a4b72cee8af0cf4cc44b1e251db6b41a0f496b3e1efc6;
+
+    /// @dev Selectors used to identify the functions to be called on external checks.
+    /// bytes4(keccak256("balanceOf(address)"))
+    bytes4 private constant BALANCE_OF_SELECTOR = 0x70a08231;
+    /// bytes4(keccak256("ownerOf(uint256)"))
+    bytes4 private constant OWNER_OF_SELECTOR = 0x6352211e;
 
     /// @notice The current contract signature index.
     /// Trades need to be signed with the current contract signature index.
@@ -76,6 +85,20 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         address beneficiary;
     }
 
+    /// @dev Schema for an external check.
+    /// @param contractAddress - The address of the contract that holds the function used to perform a check.
+    /// @param selector - The selector of the function to be called.
+    /// @param value - Numeric value used on checks. It is the tokenId for ownerOf checks, or the min amount for balanceOf checks.
+    /// @param required - If the check is required or optional.
+    /// 
+    /// Read more about external checks in the _runExternalChecks function.
+    struct ExternalCheck {
+        address contractAddress;
+        bytes4 selector;
+        uint256 value;
+        bool required;
+    }
+
     /// @dev Schema for a Trade.
     /// @param signer - The address of the user that signed the Trade.
     /// @param signature - The signature of the Trade.
@@ -86,6 +109,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @param contractSignatureIndex - The contract signature index that was used to sign the Trade.
     /// @param signerSignatureIndex - The signer signature index that was used to sign the Trade.
     /// @param allowed - An array of addresses that are allowed to accept the Trade. An empty array means any address can accept it.
+    /// @param externalChecks - An array of external checks that need to be validated to accept the Trade. An empty array means no checks are required.
     /// @param sent - An array of assets that the signer is sending in the Trade.
     /// @param received - An array of assets that the signer is receiving in the Trade.
     struct Trade {
@@ -98,6 +122,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         uint256 contractSignatureIndex;
         uint256 signerSignatureIndex;
         address[] allowed;
+        ExternalCheck[] externalChecks;
         Asset[] sent;
         Asset[] received;
     }
@@ -115,6 +140,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     error InvalidSignerSignatureIndex();
     error Expired();
     error NotAllowed();
+    error ExternalChecksFailed();
     error InvalidSignature();
 
     constructor(address _owner) EIP712("Marketplace", "1.0.0") Ownable(_owner) {}
@@ -226,6 +252,10 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 }
             }
 
+            if (trade.externalChecks.length > 0) {
+                _runExternalChecks(trade.externalChecks, caller);
+            }
+
             _verifyTradeSignature(trade, signer);
 
             if (storedSignatureUses + 1 == trade.uses) {
@@ -253,6 +283,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 _trade.contractSignatureIndex,
                 _trade.signerSignatureIndex,
                 keccak256(abi.encodePacked(_trade.allowed)),
+                keccak256(abi.encodePacked(_hashExternalChecks(_trade.externalChecks))),
                 keccak256(abi.encodePacked(_hashAssetsWithoutBeneficiary(_trade.sent))),
                 keccak256(abi.encodePacked(_hashAssets(_trade.received)))
             )
@@ -287,6 +318,18 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         return hashes;
     }
 
+    function _hashExternalChecks(ExternalCheck[] memory _externalChecks) private pure returns (bytes32[] memory) {
+        bytes32[] memory hashes = new bytes32[](_externalChecks.length);
+
+        for (uint256 i = 0; i < hashes.length; i++) {
+            ExternalCheck memory externalCheck = _externalChecks[i];
+
+            hashes[i] = keccak256(abi.encode(EXTERNAL_CHECK_TYPE_HASH, externalCheck.contractAddress, externalCheck.selector, externalCheck.value, externalCheck.required));
+        }
+
+        return hashes;
+    }
+
     /// @dev Generates a trade id from a Trade's salt, the msg.sender of the transaction, and the received assets.
     function _tradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
         bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt, _caller));
@@ -298,6 +341,82 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         }
 
         return tradeId;
+    }
+
+    /// @dev Runs external checks to validate the Trade.
+    ///
+    /// These checks include:
+    /// - balanceOf checks, were the Trade expects the caller to have a certain amount of an asset, or more.
+    /// - ownerOf checks, were the Trade expects the caller to be the owner of an asset.
+    /// - custom checks, were the Trade calls a provided function with the caller as an argument and expects `true` as a result.
+    ///
+    /// Users can play with checks in different ways:
+    /// - Define 2 required checks like owning 100 or more DAI and be the owner of an Bored Ape.
+    /// - Define 2 optional checks like being the owner of any Decentraland Estate, or owning 10 or more CryptoPunks.
+    /// - Define 1 required check and 2 optional checks. In this case the caller has to pass the required check, and only one of the optional checks.
+    ///
+    /// NOTE: If the Trade only has 1 optional check, it is the same as if it was required.
+    /// A Trade with 1 required check and 1 optional check is the same as having 2 required checks.
+    function _runExternalChecks(ExternalCheck[] memory _externalChecks, address _caller) private view {
+        // These vars are used to track if an optional check has already passed in order to skip the other optional checks.
+        bool hasOptionalChecks = false;
+        bool hasPassingOptionalCheck = false;
+
+        for (uint256 i = 0; i < _externalChecks.length; i++) {
+            ExternalCheck memory externalCheck = _externalChecks[i];
+
+            bool isRequiredCheck = externalCheck.required;
+
+            // Skip the optional check if another one has already passed.
+            if (!isRequiredCheck && hasPassingOptionalCheck) {
+                continue;
+            }
+
+            bytes4 selector = externalCheck.selector;
+
+            bytes memory functionData;
+
+            // Set the call data depending on the provided selector.
+            // The ownerOf function requires a uint256 value as an argument that would be a tokenId.
+            // balanceOf and other custom calls require the caller address as param.
+            if (selector == OWNER_OF_SELECTOR) {
+                functionData = abi.encodeWithSelector(selector, externalCheck.value);
+            } else {
+                functionData = abi.encodeWithSelector(selector, _caller);
+            }
+
+            (bool success, bytes memory data) = externalCheck.contractAddress.staticcall(functionData);
+
+            if (!success) {
+                // Do nothing here, an unsuccessful call will be treated as a failed check later.
+            } else if (selector == BALANCE_OF_SELECTOR) {
+                success = abi.decode(data, (uint256)) >= externalCheck.value;
+            } else if (selector == OWNER_OF_SELECTOR) {
+                success = abi.decode(data, (address)) == _caller;
+            } else {
+                success = abi.decode(data, (bool));
+            }
+
+            // There is no need to proceed if a required check fails.
+            if (!success && isRequiredCheck) {
+                revert ExternalChecksFailed();
+            }
+
+            // Track that an optional check has passed.
+            // If it is the first optional check to pass, set the flag to skip the other optional checks.
+            if (!isRequiredCheck) {
+                hasOptionalChecks = true;
+
+                if (success) {
+                    hasPassingOptionalCheck = true;
+                }
+            }
+        }
+
+        // If there were optional checks and none of them passed, revert.
+        if (hasOptionalChecks && !hasPassingOptionalCheck) {
+            revert ExternalChecksFailed();
+        }
     }
 
     /// @dev Verifies that the signature provided in the Trade is valid.

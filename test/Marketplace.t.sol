@@ -6,6 +6,7 @@ import {VmSafe} from "lib/forge-std/src/Vm.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {ERC1271WalletMock} from "lib/openzeppelin-contracts/contracts/mocks/ERC1271WalletMock.sol";
 import {Marketplace} from "../src/Marketplace.sol";
+import {MockExternalChecks} from "../src/mocks/MockExternalChecks.sol";
 
 contract MarketplaceHarness is Marketplace {
     constructor(address _owner) Marketplace(_owner) {}
@@ -168,6 +169,7 @@ contract MarketplaceTest is Test {
     error InvalidSignerSignatureIndex();
     error Expired();
     error NotAllowed();
+    error ExternalChecksFailed();
     error InvalidSignature();
 
     // increaseContractSignatureIndex
@@ -323,6 +325,63 @@ contract MarketplaceTest is Test {
         marketplace.accept(trades);
     }
 
+    function test_accept_RevertIfBalanceOfCheckReturnsLessThanTheProvidedValue() public {
+        MockExternalChecks externalChecks = new MockExternalChecks();
+
+        externalChecks.setBalanceOfResult(99);
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+        trades[0].externalChecks = new MarketplaceHarness.ExternalCheck[](1);
+        trades[0].externalChecks[0].contractAddress = address(externalChecks);
+        trades[0].externalChecks[0].selector = externalChecks.balanceOf.selector;
+        trades[0].externalChecks[0].value = 100;
+        trades[0].externalChecks[0].required = false;
+
+        vm.prank(caller1);
+        vm.expectRevert(ExternalChecksFailed.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertIfOwnerOfCheckReturnsDifferentAddressThanCaller() public {
+        MockExternalChecks externalChecks = new MockExternalChecks();
+
+        externalChecks.setOwnerOfResult(caller2);
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+        trades[0].externalChecks = new MarketplaceHarness.ExternalCheck[](1);
+        trades[0].externalChecks[0].contractAddress = address(externalChecks);
+        trades[0].externalChecks[0].selector = externalChecks.ownerOf.selector;
+        trades[0].externalChecks[0].value = 1;
+        trades[0].externalChecks[0].required = false;
+
+        vm.prank(caller1);
+        vm.expectRevert(ExternalChecksFailed.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_accept_RevertIfCustomCheckFunctionCallReturnsFalse() public {
+        MockExternalChecks externalChecks = new MockExternalChecks();
+
+        externalChecks.setCustomCheckFunctionResult(false);
+
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].expiration = block.timestamp;
+        trades[0].externalChecks = new MarketplaceHarness.ExternalCheck[](1);
+        trades[0].externalChecks[0].contractAddress = address(externalChecks);
+        trades[0].externalChecks[0].selector = externalChecks.customCheckFunction.selector;
+        trades[0].externalChecks[0].value = 0;
+        trades[0].externalChecks[0].required = false;
+
+        vm.prank(caller1);
+        vm.expectRevert(ExternalChecksFailed.selector);
+        marketplace.accept(trades);
+    }
+
     function test_accept_RevertIfInvalidSigner() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
@@ -377,8 +436,7 @@ contract MarketplaceTest is Test {
         marketplace.accept(trades);
     }
 
-
-        function test_accept_Traded_ManyAllowed() public {
+    function test_accept_Traded_ManyAllowed() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].expiration = block.timestamp;
@@ -405,7 +463,7 @@ contract MarketplaceTest is Test {
         emit Traded(vm.addr(0xb), keccak256(trades[0].signature));
         marketplace.accept(trades);
     }
-    
+
     // accept - Sent asset beneficiary
 
     function test_accept_AllowsSentAssetBeneficiaryToBeChanged() public {
@@ -490,7 +548,7 @@ contract MarketplaceTest is Test {
 
     // accept - Trade ID
 
-    function test_accept_RevertsIfTradeIdIsReused() public {
+    function test_accept_RevertIfTradeIdIsReused() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         {
@@ -521,7 +579,7 @@ contract MarketplaceTest is Test {
         marketplace.accept(trades);
     }
 
-    function test_accept_RevertsIfTradeIdIsReused_OnlyAfterSignatureReusesReachesItsLimit() public {
+    function test_accept_RevertIfTradeIdIsReused_OnlyAfterSignatureReusesReachesItsLimit() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         {
@@ -633,7 +691,7 @@ contract MarketplaceTest is Test {
         marketplace.accept(trades);
     }
 
-    function test_accept_RevertsIfTryingToAcceptDifferentTradeFromFinishedAuction() public {
+    function test_accept_RevertIfTryingToAcceptDifferentTradeFromFinishedAuction() public {
         MarketplaceHarness.Trade[] memory offerA = new MarketplaceHarness.Trade[](1);
 
         {
