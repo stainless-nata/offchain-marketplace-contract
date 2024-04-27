@@ -92,8 +92,8 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @param selector - The selector of the function to be called.
     /// @param value - Numeric value used on checks. It is the tokenId for ownerOf checks, or the min amount for balanceOf checks.
     /// @param required - If the check is required or optional.
-    /// 
-    /// Read more about external checks in the _runExternalChecks function.
+    ///
+    /// Read more about external checks in the _verifyExternalChecks function.
     struct ExternalCheck {
         address contractAddress;
         bytes4 selector;
@@ -211,7 +211,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 revert SignatureReuse();
             }
 
-            bytes32 tradeId = _tradeId(trade, caller);
+            bytes32 tradeId = getTradeId(trade, caller);
 
             if (usedTradeIds[tradeId]) {
                 revert UsedTradeId();
@@ -235,27 +235,12 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
                 revert Expired();
             }
 
-            address[] memory allowed = trade.allowed;
-
-            uint256 allowedLength = trade.allowed.length;
-
-            if (allowedLength > 0) {
-                bool isAllowed = false;
-
-                for (uint256 j = 0; j < allowedLength; j++) {
-                    if (allowed[j] == caller) {
-                        isAllowed = true;
-                        break;
-                    }
-                }
-
-                if (!isAllowed) {
-                    revert NotAllowed();
-                }
+            if (trade.allowed.length > 0) {
+                _verifyAllowed(trade.allowed, caller);
             }
 
             if (trade.externalChecks.length > 0) {
-                _runExternalChecks(trade.externalChecks, caller);
+                _verifyExternalChecks(trade.externalChecks, caller);
             }
 
             _verifyTradeSignature(trade, signer);
@@ -270,6 +255,19 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
             _transferAssets(trade.received, caller, signer, signer);
         }
+    }
+
+    /// @dev Generates a trade id from a Trade's salt, the msg.sender of the transaction, and the received assets.
+    function getTradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
+        bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt, _caller));
+
+        for (uint256 i = 0; i < _trade.received.length; i++) {
+            Asset memory asset = _trade.received[i];
+
+            tradeId = keccak256(abi.encodePacked(tradeId, asset.contractAddress, asset.value));
+        }
+
+        return tradeId;
     }
 
     /// @dev Hashes a Trade according to the EIP712 standard.
@@ -326,23 +324,24 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         for (uint256 i = 0; i < hashes.length; i++) {
             ExternalCheck memory externalCheck = _externalChecks[i];
 
-            hashes[i] = keccak256(abi.encode(EXTERNAL_CHECK_TYPE_HASH, externalCheck.contractAddress, externalCheck.selector, externalCheck.value, externalCheck.required));
+            hashes[i] = keccak256(
+                abi.encode(
+                    EXTERNAL_CHECK_TYPE_HASH, externalCheck.contractAddress, externalCheck.selector, externalCheck.value, externalCheck.required
+                )
+            );
         }
 
         return hashes;
     }
 
-    /// @dev Generates a trade id from a Trade's salt, the msg.sender of the transaction, and the received assets.
-    function _tradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
-        bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt, _caller));
-
-        for (uint256 i = 0; i < _trade.received.length; i++) {
-            Asset memory asset = _trade.received[i];
-
-            tradeId = keccak256(abi.encodePacked(tradeId, asset.contractAddress, asset.value));
+    function _verifyAllowed(address[] memory _allowed, address _caller) private pure {
+        for (uint256 j = 0; j < _allowed.length; j++) {
+            if (_allowed[j] == _caller) {
+                return;
+            }
         }
 
-        return tradeId;
+        revert NotAllowed();
     }
 
     /// @dev Runs external checks to validate the Trade.
@@ -359,7 +358,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     ///
     /// NOTE: If the Trade only has 1 optional check, it is the same as if it was required.
     /// A Trade with 1 required check and 1 optional check is the same as having 2 required checks.
-    function _runExternalChecks(ExternalCheck[] memory _externalChecks, address _caller) private view {
+    function _verifyExternalChecks(ExternalCheck[] memory _externalChecks, address _caller) private view {
         // These vars are used to track if an optional check has already passed in order to skip the other optional checks.
         bool hasOptionalChecks = false;
         bool hasPassingOptionalCheck = false;
