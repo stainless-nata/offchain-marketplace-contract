@@ -25,6 +25,7 @@ abstract contract CollectionItemTransfer is Context {
     uint256 private immutable collectionStoreFeeRateBase;
     address private immutable collectionStoreFeeCollector;
 
+    error NotSentAsset();
     error NotCreator();
     error DifferentCollectionContractAddress();
     error DifferentCollectionItemId();
@@ -72,10 +73,13 @@ abstract contract CollectionItemTransfer is Context {
     ///
     /// It will obtain the item price from the collection and apply the discount to it.
     /// The same ERC20 token, and Fee parameters from the CollectionsStore contract are used.
-    ///
-    /// NOTE: The Asset that this function receives should come from the `sent` assets from the Trade.
-    /// If the asset comes from the received assets, the creator will be paid, but will receive the issued token as well.
-    function _transferCollectionItemWithDiscount(Marketplace.Asset memory _asset, address _signer) internal {
+    function _transferCollectionItemWithDiscount(Marketplace.Asset memory _asset, address _from, address _signer) internal {
+        // If the from is different from the signer, this is because the Asset has been set as an asset that will be received by the signer,
+        // which in this case is not supported given that it could cause the caller to pay for the items but the signer receiving them.
+        if (_from != _signer) {
+            revert NotSentAsset();
+        }
+
         // Extract the item that the user wants to buy.
         (address contractAddress, uint256 itemId, uint256 price) = abi.decode(_asset.unverifiedExtra, (address, uint256, uint256));
 

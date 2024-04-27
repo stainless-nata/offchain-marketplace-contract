@@ -27,7 +27,7 @@ contract PolygonMarketplace is Marketplace, NativeMetaTransaction, SimpleTokenTr
         } else if (_asset.assetType == COLLECTION_ITEM_ID) {
             _transferCollectionItem(_asset, _signer);
         } else if (_asset.assetType == COLLECTION_ITEM_WITH_DISCOUNT_ID) {
-            _transferCollectionItemWithDiscount(_asset, _signer);
+            _transferCollectionItemWithDiscount(_asset, _from, _signer);
         } else {
             revert UnsupportedAssetType(_asset.assetType);
         }
