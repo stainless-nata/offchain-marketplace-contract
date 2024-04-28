@@ -25,7 +25,7 @@ contract MarketplaceHarness is Marketplace {
     function _transferAsset(Asset memory _asset, address _from, address _signer) internal override {}
 }
 
-contract MarketplaceTests is Test {
+abstract contract MarketplaceTests is Test {
     address owner;
     address other;
 
