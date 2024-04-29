@@ -441,6 +441,7 @@ contract ExampleTests is EthereumMarketplaceTests {
     IERC721 land;
     IERC721 names;
     IComposable estate;
+    address dao;
 
     error ExternalChecksFailed();
 
@@ -452,6 +453,8 @@ contract ExampleTests is EthereumMarketplaceTests {
         names = IERC721(0x2A187453064356c898cAe034EAed119E1663ACb8);
         estate = IComposable(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
 
+        dao = 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce;
+
         vm.prank(other);
         mana.approve(address(marketplace), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
 
@@ -460,11 +463,15 @@ contract ExampleTests is EthereumMarketplaceTests {
         names.setApprovalForAll(address(marketplace), true);
         estate.setApprovalForAll(address(marketplace), true);
         vm.stopPrank();
+
+        vm.startPrank(other);
+        land.setApprovalForAll(address(marketplace), true);
+        names.setApprovalForAll(address(marketplace), true);
+        estate.setApprovalForAll(address(marketplace), true);
+        vm.stopPrank();
     }
 
     function test_Trade1LandFor1000ManaWithDAOFee() public {
-        address dao = 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce;
-
         address landOriginalOwner = 0x001B71FAD769B3cd47fD4C9849c704FdFaBF6096;
         uint256 landTokenId = 42535295865117307932921825928971026431990;
         vm.prank(landOriginalOwner);
@@ -509,8 +516,6 @@ contract ExampleTests is EthereumMarketplaceTests {
     }
 
     function test_Trade1LandFor1000ManaWithDAOFee_CallerHasToOwnDecentralandName() public {
-        address dao = 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce;
-
         address landOriginalOwner = 0x001B71FAD769B3cd47fD4C9849c704FdFaBF6096;
         uint256 landTokenId = 42535295865117307932921825928971026431990;
         vm.prank(landOriginalOwner);
@@ -568,8 +573,6 @@ contract ExampleTests is EthereumMarketplaceTests {
     }
 
     function test_Trade3LandFor1000ManaWithDAOFee() public {
-        address dao = 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce;
-
         address landOriginalOwner1 = 0x001B71FAD769B3cd47fD4C9849c704FdFaBF6096;
         uint256 landTokenId1 = 42535295865117307932921825928971026431990;
         vm.prank(landOriginalOwner1);
@@ -631,5 +634,50 @@ contract ExampleTests is EthereumMarketplaceTests {
         assertEq(mana.balanceOf(signer.addr), signerBalancePreTrade + 975 ether);
         assertEq(mana.balanceOf(other), callerBalancePreTrade - 1000 ether);
         assertEq(mana.balanceOf(dao), daoBalancePreTrade + 25 ether);
+    }
+
+    function test_Trade1EstateFor1LandAnd1Name() public {
+        address landOriginalOwner = 0x001B71FAD769B3cd47fD4C9849c704FdFaBF6096;
+        uint256 landTokenId = 42535295865117307932921825928971026431990;
+        vm.prank(landOriginalOwner);
+        land.transferFrom(landOriginalOwner, other, landTokenId);
+
+        address nameOriginalOwner = 0xf0ABCFEAA30A95D32569Fcf2B3a48bc7CB639871;
+        uint256 nameTokenId = 100000524771658066136810291574007504540382436851477100100347508325030054457380;
+        vm.prank(nameOriginalOwner);
+        names.transferFrom(nameOriginalOwner, other, nameTokenId);
+
+        address estateOriginalOwner = 0x9aBdCb8825696CC2Ef3A0a955f99850418847F5D;
+        uint256 estateTokenId = 1;
+        vm.prank(estateOriginalOwner);
+        estate.transferFrom(estateOriginalOwner, signer.addr, estateTokenId);
+
+        EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
+        trades[0].expiration = block.timestamp;
+        trades[0].sent = new EthereumMarketplace.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
+        trades[0].sent[0].contractAddress = address(estate);
+        trades[0].sent[0].value = estateTokenId;
+        trades[0].sent[0].extra = abi.encode(estate.getFingerprint(estateTokenId));
+        trades[0].received = new EthereumMarketplace.Asset[](2);
+        trades[0].received[0].assetType = marketplace.ERC721_ID();
+        trades[0].received[0].contractAddress = address(land);
+        trades[0].received[0].value = landTokenId;
+        trades[0].received[1].assetType = marketplace.ERC721_ID();
+        trades[0].received[1].contractAddress = address(names);
+        trades[0].received[1].value = nameTokenId;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        assertEq(estate.ownerOf(estateTokenId), signer.addr);
+        assertEq(land.ownerOf(landTokenId), other);
+        assertEq(names.ownerOf(nameTokenId), other);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        assertEq(estate.ownerOf(estateTokenId), other);
+        assertEq(land.ownerOf(landTokenId), signer.addr);
+        assertEq(names.ownerOf(nameTokenId), signer.addr);
     }
 }
