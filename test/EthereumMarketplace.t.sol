@@ -193,8 +193,8 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
         erc721OriginalHolder = 0x959e104E1a4dB6317fA58F8295F586e1A978c297;
     }
 
-    function _getBaseTrades() internal view override returns (EthereumMarketplace.Trade[] memory) {
-        EthereumMarketplace.Trade[] memory trades = super._getBaseTrades();
+    function _getBaseTradesForSent() private view returns (EthereumMarketplace.Trade[] memory) {
+        EthereumMarketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].sent = new EthereumMarketplace.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ERC721_ID();
         trades[0].sent[0].contractAddress = address(erc721);
@@ -203,8 +203,26 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
         return trades;
     }
 
-    function test_RevertsIfSignerHasNotApprovedTheMarketplaceToSendERC721() public {
+    function _getBaseTradesForReceived() private view returns (EthereumMarketplace.Trade[] memory) {
         EthereumMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].received = new EthereumMarketplace.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ERC721_ID();
+        trades[0].received[0].contractAddress = address(erc721);
+        trades[0].received[0].value = erc721TokenId;
+        trades[0].signature = signTrade(trades[0]);
+        return trades;
+    }
+
+    function test_RevertsIfSignerHasNotApprovedTheMarketplaceToSendERC721() public {
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForSent();
+
+        vm.prank(other);
+        vm.expectRevert();
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfCallerHasNotApprovedTheMarketplaceToSendERC721() public {
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert();
@@ -215,7 +233,18 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
         vm.prank(signer.addr);
         erc721.setApprovalForAll(address(marketplace), true);
 
-        EthereumMarketplace.Trade[] memory trades = _getBaseTrades();
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForSent();
+
+        vm.prank(other);
+        vm.expectRevert();
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfCallerDoesNotHaveTheERC721Token() public {
+        vm.prank(other);
+        erc721.setApprovalForAll(address(marketplace), true);
+
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert();
@@ -229,7 +258,7 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
         vm.prank(erc721OriginalHolder);
         erc721.transferFrom(erc721OriginalHolder, signer.addr, erc721TokenId);
 
-        EthereumMarketplace.Trade[] memory trades = _getBaseTrades();
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectEmit(address(erc721));
@@ -237,6 +266,23 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
         marketplace.accept(trades);
 
         assertEq(erc721.ownerOf(erc721TokenId), other);
+    }
+
+    function test_TransfersERC721FromCallerToSigner() public {
+        vm.prank(other);
+        erc721.setApprovalForAll(address(marketplace), true);
+
+        vm.prank(erc721OriginalHolder);
+        erc721.transferFrom(erc721OriginalHolder, other, erc721TokenId);
+
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
+
+        vm.prank(other);
+        vm.expectEmit(address(erc721));
+        emit Transfer(other, signer.addr, erc721TokenId);
+        marketplace.accept(trades);
+
+        assertEq(erc721.ownerOf(erc721TokenId), signer.addr);
     }
 }
 
