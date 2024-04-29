@@ -6,6 +6,7 @@ import {VmSafe} from "forge-std/Vm.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {EthereumMarketplace} from "../src/EthereumMarketplace.sol";
+import {IComposable} from "../src/interfaces/IComposable.sol";
 
 contract EthereumMarketplaceHarness is EthereumMarketplace {
     constructor(address _owner) EthereumMarketplace(_owner) {}
@@ -95,11 +96,10 @@ contract TransferERC20Tests is EthereumMarketplaceTests {
 
     function test_RevertsIfSignerDoesNotHaveEnoughERC20Balance() public {
         assertEq(erc20.allowance(signer.addr, address(marketplace)), 0);
-
         vm.prank(signer.addr);
         erc20.approve(address(marketplace), erc20Sent);
-
         assertEq(erc20.allowance(signer.addr, address(marketplace)), erc20Sent);
+
         assertEq(erc20.balanceOf(signer.addr), 0);
 
         EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
@@ -118,15 +118,12 @@ contract TransferERC20Tests is EthereumMarketplaceTests {
 
     function test_TransfersERC20FromSignerToCaller() public {
         assertEq(erc20.allowance(signer.addr, address(marketplace)), 0);
-
         vm.prank(signer.addr);
         erc20.approve(address(marketplace), erc20Sent);
-
         assertEq(erc20.allowance(signer.addr, address(marketplace)), erc20Sent);
 
         vm.prank(erc20OriginalHolder);
         erc20.transfer(signer.addr, erc20Sent);
-
         assertEq(erc20.balanceOf(signer.addr), erc20Sent);
 
         EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
@@ -179,10 +176,8 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
 
     function test_RevertsIfSignerDoesNotHaveTheERC721Token() public {
         assertFalse(erc721.isApprovedForAll(signer.addr, address(marketplace)));
-
         vm.prank(signer.addr);
         erc721.setApprovalForAll(address(marketplace), true);
-
         assertTrue(erc721.isApprovedForAll(signer.addr, address(marketplace)));
 
         assertNotEq(erc721.ownerOf(erc721TokenId), signer.addr);
@@ -203,15 +198,12 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
 
     function test_TransfersERC721FromSignerToCaller() public {
         assertFalse(erc721.isApprovedForAll(signer.addr, address(marketplace)));
-
         vm.prank(signer.addr);
         erc721.setApprovalForAll(address(marketplace), true);
-
         assertTrue(erc721.isApprovedForAll(signer.addr, address(marketplace)));
 
         vm.prank(erc721OriginalHolder);
         erc721.transferFrom(erc721OriginalHolder, signer.addr, erc721TokenId);
-
         assertEq(erc721.ownerOf(erc721TokenId), signer.addr);
 
         EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
@@ -229,5 +221,98 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
         marketplace.accept(trades);
 
         assertEq(erc721.ownerOf(erc721TokenId), other);
+    }
+}
+
+contract TransferComposableTokenTests is EthereumMarketplaceTests {
+    IComposable composable;
+    uint256 composableTokenId;
+    address composableOriginalHolder;
+
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+
+    error InvalidFingerprint();
+
+    function setUp() public override {
+        super.setUp();
+        composable = IComposable(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+        composableTokenId = 1;
+        composableOriginalHolder = 0x9aBdCb8825696CC2Ef3A0a955f99850418847F5D;
+    }
+
+    function test_RevertsIfFingerprintIsInvalid() public {
+        EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
+        trades[0].expiration = block.timestamp;
+        trades[0].sent = new EthereumMarketplace.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
+        trades[0].sent[0].contractAddress = address(composable);
+        trades[0].sent[0].value = composableTokenId;
+        trades[0].sent[0].extra = abi.encode(uint256(123));
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        vm.expectRevert(InvalidFingerprint.selector);
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfSignerIsNotTheOwnerOfTheComposableToken() public {
+        EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
+        trades[0].expiration = block.timestamp;
+        trades[0].sent = new EthereumMarketplace.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
+        trades[0].sent[0].contractAddress = address(composable);
+        trades[0].sent[0].value = composableTokenId;
+        trades[0].sent[0].extra = abi.encode(composable.getFingerprint(composableTokenId));
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        vm.expectRevert("Only owner or operator can transfer");
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfSignerHasNotApprovedTheMarketplaceContractToTransferTheComposableToken() public {
+        vm.prank(composableOriginalHolder);
+        composable.transferFrom(composableOriginalHolder, signer.addr, composableTokenId);
+
+        EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
+        trades[0].expiration = block.timestamp;
+        trades[0].sent = new EthereumMarketplace.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
+        trades[0].sent[0].contractAddress = address(composable);
+        trades[0].sent[0].value = composableTokenId;
+        trades[0].sent[0].extra = abi.encode(composable.getFingerprint(composableTokenId));
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        vm.expectRevert("Only owner or operator can transfer");
+        marketplace.accept(trades);
+    }
+
+    function test_TransfersComposableTokenFromSignerToCaller() public {
+        vm.prank(composableOriginalHolder);
+        composable.transferFrom(composableOriginalHolder, signer.addr, composableTokenId);
+
+        vm.prank(signer.addr);
+        composable.setApprovalForAll(address(marketplace), true);
+
+        EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
+        trades[0].expiration = block.timestamp;
+        trades[0].sent = new EthereumMarketplace.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
+        trades[0].sent[0].contractAddress = address(composable);
+        trades[0].sent[0].value = composableTokenId;
+        trades[0].sent[0].extra = abi.encode(composable.getFingerprint(composableTokenId));
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        vm.expectEmit(address(composable));
+        emit Transfer(signer.addr, other, composableTokenId);
+        marketplace.accept(trades);
+
+        assertEq(composable.ownerOf(composableTokenId), other);
     }
 }
