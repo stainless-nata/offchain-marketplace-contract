@@ -105,6 +105,9 @@ contract TransferERC20Tests is EthereumMarketplaceTests {
     }
 
     function test_RevertsIfSignerHasNotApprovedTheMarketplaceToSendERC20() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(signer.addr, erc20Sent);
+
         EthereumMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
@@ -113,6 +116,9 @@ contract TransferERC20Tests is EthereumMarketplaceTests {
     }
 
     function test_RevertsIfCallerHasNotApprovedTheMarketplaceToSendERC20() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
         EthereumMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
@@ -214,6 +220,9 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
     }
 
     function test_RevertsIfSignerHasNotApprovedTheMarketplaceToSendERC721() public {
+        vm.prank(erc721OriginalHolder);
+        erc721.transferFrom(erc721OriginalHolder, signer.addr, erc721TokenId);
+
         EthereumMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
@@ -222,6 +231,9 @@ contract TransferERC721Tests is EthereumMarketplaceTests {
     }
 
     function test_RevertsIfCallerHasNotApprovedTheMarketplaceToSendERC721() public {
+        vm.prank(erc721OriginalHolder);
+        erc721.transferFrom(erc721OriginalHolder, other, erc721TokenId);
+
         EthereumMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
@@ -302,8 +314,8 @@ contract TransferComposableTokenTests is EthereumMarketplaceTests {
         composableOriginalHolder = 0x9aBdCb8825696CC2Ef3A0a955f99850418847F5D;
     }
 
-    function _getBaseTrades() internal view override returns (EthereumMarketplace.Trade[] memory) {
-        EthereumMarketplace.Trade[] memory trades = super._getBaseTrades();
+    function _getBaseTradesForSent() private view returns (EthereumMarketplace.Trade[] memory) {
+        EthereumMarketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].sent = new EthereumMarketplace.Asset[](1);
         trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
         trades[0].sent[0].contractAddress = address(composable);
@@ -313,8 +325,19 @@ contract TransferComposableTokenTests is EthereumMarketplaceTests {
         return trades;
     }
 
-    function test_RevertsIfFingerprintIsInvalid() public {
+    function _getBaseTradesForReceived() private view returns (EthereumMarketplace.Trade[] memory) {
         EthereumMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].received = new EthereumMarketplace.Asset[](1);
+        trades[0].received[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
+        trades[0].received[0].contractAddress = address(composable);
+        trades[0].received[0].value = composableTokenId;
+        trades[0].received[0].extra = abi.encode(composable.getFingerprint(composableTokenId));
+        trades[0].signature = signTrade(trades[0]);
+        return trades;
+    }
+
+    function test_RevertsIfSentAssetFingerprintIsInvalid() public {
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForSent();
         trades[0].sent[0].extra = abi.encode(uint256(123));
         trades[0].signature = signTrade(trades[0]);
 
@@ -323,8 +346,32 @@ contract TransferComposableTokenTests is EthereumMarketplaceTests {
         marketplace.accept(trades);
     }
 
+    function test_RevertsIfReceivedAssetFingerprintIsInvalid() public {
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        trades[0].received[0].extra = abi.encode(uint256(123));
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        vm.expectRevert(InvalidFingerprint.selector);
+        marketplace.accept(trades);
+    }
+
     function test_RevertsIfSignerIsNotTheOwnerOfTheComposableToken() public {
-        EthereumMarketplace.Trade[] memory trades = _getBaseTrades();
+        vm.prank(signer.addr);
+        composable.setApprovalForAll(address(marketplace), true);
+
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForSent();
+
+        vm.prank(other);
+        vm.expectRevert("Only owner or operator can transfer");
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfCallerIsNotTheOwnerOfTheComposableToken() public {
+        vm.prank(other);
+        composable.setApprovalForAll(address(marketplace), true);
+
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert("Only owner or operator can transfer");
@@ -335,7 +382,18 @@ contract TransferComposableTokenTests is EthereumMarketplaceTests {
         vm.prank(composableOriginalHolder);
         composable.transferFrom(composableOriginalHolder, signer.addr, composableTokenId);
 
-        EthereumMarketplace.Trade[] memory trades = _getBaseTrades();
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForSent();
+
+        vm.prank(other);
+        vm.expectRevert("Only owner or operator can transfer");
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfCallerHasNotApprovedTheMarketplaceContractToTransferTheComposableToken() public {
+        vm.prank(composableOriginalHolder);
+        composable.transferFrom(composableOriginalHolder, other, composableTokenId);
+
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert("Only owner or operator can transfer");
@@ -349,7 +407,7 @@ contract TransferComposableTokenTests is EthereumMarketplaceTests {
         vm.prank(signer.addr);
         composable.setApprovalForAll(address(marketplace), true);
 
-        EthereumMarketplace.Trade[] memory trades = _getBaseTrades();
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectEmit(address(composable));
@@ -357,5 +415,22 @@ contract TransferComposableTokenTests is EthereumMarketplaceTests {
         marketplace.accept(trades);
 
         assertEq(composable.ownerOf(composableTokenId), other);
+    }
+
+    function test_TransfersComposableTokenFromCallerToSigner() public {
+        vm.prank(composableOriginalHolder);
+        composable.transferFrom(composableOriginalHolder, other, composableTokenId);
+
+        vm.prank(other);
+        composable.setApprovalForAll(address(marketplace), true);
+
+        EthereumMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
+
+        vm.prank(other);
+        vm.expectEmit(address(composable));
+        emit Transfer(other, signer.addr, composableTokenId);
+        marketplace.accept(trades);
+
+        assertEq(composable.ownerOf(composableTokenId), signer.addr);
     }
 }
