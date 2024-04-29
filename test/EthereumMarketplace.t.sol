@@ -435,3 +435,201 @@ contract TransferComposableTokenTests is EthereumMarketplaceTests {
         assertEq(composable.ownerOf(composableTokenId), signer.addr);
     }
 }
+
+contract ExampleTests is EthereumMarketplaceTests {
+    IERC20 mana;
+    IERC721 land;
+    IERC721 names;
+    IComposable estate;
+
+    error ExternalChecksFailed();
+
+    function setUp() public override {
+        super.setUp();
+
+        mana = IERC20(0x0F5D2fB29fb7d3CFeE444a200298f468908cC942);
+        land = IERC721(0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d);
+        names = IERC721(0x2A187453064356c898cAe034EAed119E1663ACb8);
+        estate = IComposable(0x959e104E1a4dB6317fA58F8295F586e1A978c297);
+
+        vm.prank(other);
+        mana.approve(address(marketplace), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+
+        vm.startPrank(signer.addr);
+        land.setApprovalForAll(address(marketplace), true);
+        names.setApprovalForAll(address(marketplace), true);
+        estate.setApprovalForAll(address(marketplace), true);
+        vm.stopPrank();
+    }
+
+    function test_Trade1LandFor1000ManaWithDAOFee() public {
+        address dao = 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce;
+
+        address landOriginalOwner = 0x001B71FAD769B3cd47fD4C9849c704FdFaBF6096;
+        uint256 landTokenId = 42535295865117307932921825928971026431990;
+        vm.prank(landOriginalOwner);
+        land.transferFrom(landOriginalOwner, signer.addr, landTokenId);
+
+        address manaOriginalHolder = 0x67c231cF2B0E9518aBa46bDea6b10E0D0C5fEd1B;
+        uint256 manaOriginalHolderBalance = mana.balanceOf(manaOriginalHolder);
+        vm.prank(manaOriginalHolder);
+        mana.transfer(other, manaOriginalHolderBalance);
+
+        EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
+        trades[0].expiration = block.timestamp;
+        trades[0].sent = new EthereumMarketplace.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.ERC721_ID();
+        trades[0].sent[0].contractAddress = address(land);
+        trades[0].sent[0].value = landTokenId;
+        trades[0].received = new EthereumMarketplace.Asset[](2);
+        trades[0].received[0].assetType = marketplace.ERC20_ID();
+        trades[0].received[0].contractAddress = address(mana);
+        trades[0].received[0].value = 975 ether;
+        trades[0].received[1].assetType = marketplace.ERC20_ID();
+        trades[0].received[1].contractAddress = address(mana);
+        trades[0].received[1].value = 25 ether;
+        trades[0].received[1].beneficiary = dao;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        assertEq(land.ownerOf(landTokenId), signer.addr);
+
+        uint256 signerBalancePreTrade = mana.balanceOf(signer.addr);
+        uint256 callerBalancePreTrade = mana.balanceOf(other);
+        uint256 daoBalancePreTrade = mana.balanceOf(dao);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        assertEq(land.ownerOf(landTokenId), other);
+
+        assertEq(mana.balanceOf(signer.addr), signerBalancePreTrade + 975 ether);
+        assertEq(mana.balanceOf(other), callerBalancePreTrade - 1000 ether);
+        assertEq(mana.balanceOf(dao), daoBalancePreTrade + 25 ether);
+    }
+
+    function test_Trade1LandFor1000ManaWithDAOFee_CallerHasToOwnDecentralandName() public {
+        address dao = 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce;
+
+        address landOriginalOwner = 0x001B71FAD769B3cd47fD4C9849c704FdFaBF6096;
+        uint256 landTokenId = 42535295865117307932921825928971026431990;
+        vm.prank(landOriginalOwner);
+        land.transferFrom(landOriginalOwner, signer.addr, landTokenId);
+
+        address manaOriginalHolder = 0x67c231cF2B0E9518aBa46bDea6b10E0D0C5fEd1B;
+        uint256 manaOriginalHolderBalance = mana.balanceOf(manaOriginalHolder);
+        vm.prank(manaOriginalHolder);
+        mana.transfer(other, manaOriginalHolderBalance);
+
+        EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
+        trades[0].expiration = block.timestamp;
+        trades[0].externalChecks = new EthereumMarketplace.ExternalCheck[](1);
+        trades[0].externalChecks[0].contractAddress = address(names);
+        trades[0].externalChecks[0].value = 1;
+        trades[0].externalChecks[0].selector = names.balanceOf.selector;
+        trades[0].externalChecks[0].required = true;
+        trades[0].sent = new EthereumMarketplace.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.ERC721_ID();
+        trades[0].sent[0].contractAddress = address(land);
+        trades[0].sent[0].value = landTokenId;
+        trades[0].received = new EthereumMarketplace.Asset[](2);
+        trades[0].received[0].assetType = marketplace.ERC20_ID();
+        trades[0].received[0].contractAddress = address(mana);
+        trades[0].received[0].value = 975 ether;
+        trades[0].received[1].assetType = marketplace.ERC20_ID();
+        trades[0].received[1].contractAddress = address(mana);
+        trades[0].received[1].value = 25 ether;
+        trades[0].received[1].beneficiary = dao;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        assertEq(land.ownerOf(landTokenId), signer.addr);
+
+        uint256 signerBalancePreTrade = mana.balanceOf(signer.addr);
+        uint256 callerBalancePreTrade = mana.balanceOf(other);
+        uint256 daoBalancePreTrade = mana.balanceOf(dao);
+
+        vm.prank(other);
+        vm.expectRevert(ExternalChecksFailed.selector);
+        marketplace.accept(trades);
+
+        address nameOriginalOwner = 0xf0ABCFEAA30A95D32569Fcf2B3a48bc7CB639871;
+        vm.prank(nameOriginalOwner);
+        names.transferFrom(nameOriginalOwner, other, 100000524771658066136810291574007504540382436851477100100347508325030054457380);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        assertEq(land.ownerOf(landTokenId), other);
+
+        assertEq(mana.balanceOf(signer.addr), signerBalancePreTrade + 975 ether);
+        assertEq(mana.balanceOf(other), callerBalancePreTrade - 1000 ether);
+        assertEq(mana.balanceOf(dao), daoBalancePreTrade + 25 ether);
+    }
+
+    function test_Trade3LandFor1000ManaWithDAOFee() public {
+        address dao = 0x9A6ebE7E2a7722F8200d0ffB63a1F6406A0d7dce;
+
+        address landOriginalOwner1 = 0x001B71FAD769B3cd47fD4C9849c704FdFaBF6096;
+        uint256 landTokenId1 = 42535295865117307932921825928971026431990;
+        vm.prank(landOriginalOwner1);
+        land.transferFrom(landOriginalOwner1, signer.addr, landTokenId1);
+
+        address landOriginalOwner2 = 0x001e40d30267759828A9022ed8116F7b08E22AD1;
+        uint256 landTokenId2 = 40833884030512615615604952891812185374713;
+        vm.prank(landOriginalOwner2);
+        land.transferFrom(landOriginalOwner2, signer.addr, landTokenId2);
+
+        address landOriginalOwner3 = 0x0020014100F57d2F8785368C8FBc48A302607e20;
+        uint256 landTokenId3 = 15312706511442230855851857334429569515624;
+        vm.prank(landOriginalOwner3);
+        land.transferFrom(landOriginalOwner3, signer.addr, landTokenId3);
+
+        address manaOriginalHolder = 0x67c231cF2B0E9518aBa46bDea6b10E0D0C5fEd1B;
+        uint256 manaOriginalHolderBalance = mana.balanceOf(manaOriginalHolder);
+        vm.prank(manaOriginalHolder);
+        mana.transfer(other, manaOriginalHolderBalance);
+
+        EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
+        trades[0].expiration = block.timestamp;
+        trades[0].sent = new EthereumMarketplace.Asset[](3);
+        trades[0].sent[0].assetType = marketplace.ERC721_ID();
+        trades[0].sent[0].contractAddress = address(land);
+        trades[0].sent[0].value = landTokenId1;
+        trades[0].sent[1].assetType = marketplace.ERC721_ID();
+        trades[0].sent[1].contractAddress = address(land);
+        trades[0].sent[1].value = landTokenId2;
+        trades[0].sent[2].assetType = marketplace.ERC721_ID();
+        trades[0].sent[2].contractAddress = address(land);
+        trades[0].sent[2].value = landTokenId3;
+        trades[0].received = new EthereumMarketplace.Asset[](2);
+        trades[0].received[0].assetType = marketplace.ERC20_ID();
+        trades[0].received[0].contractAddress = address(mana);
+        trades[0].received[0].value = 975 ether;
+        trades[0].received[1].assetType = marketplace.ERC20_ID();
+        trades[0].received[1].contractAddress = address(mana);
+        trades[0].received[1].value = 25 ether;
+        trades[0].received[1].beneficiary = dao;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        assertEq(land.ownerOf(landTokenId1), signer.addr);
+        assertEq(land.ownerOf(landTokenId2), signer.addr);
+        assertEq(land.ownerOf(landTokenId3), signer.addr);
+
+        uint256 signerBalancePreTrade = mana.balanceOf(signer.addr);
+        uint256 callerBalancePreTrade = mana.balanceOf(other);
+        uint256 daoBalancePreTrade = mana.balanceOf(dao);
+
+        vm.prank(other);
+        marketplace.accept(trades);
+
+        assertEq(land.ownerOf(landTokenId1), other);
+        assertEq(land.ownerOf(landTokenId2), other);
+        assertEq(land.ownerOf(landTokenId3), other);
+
+        assertEq(mana.balanceOf(signer.addr), signerBalancePreTrade + 975 ether);
+        assertEq(mana.balanceOf(other), callerBalancePreTrade - 1000 ether);
+        assertEq(mana.balanceOf(dao), daoBalancePreTrade + 25 ether);
+    }
+}
