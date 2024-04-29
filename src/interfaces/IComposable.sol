@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 
 interface IComposable is IERC721 {
     function verifyFingerprint(uint256 _estateId, bytes memory _fingerprint) external returns (bool);

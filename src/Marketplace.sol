@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
-import {IERC721} from "lib/openzeppelin-contracts/contracts/interfaces/IERC721.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {Pausable} from "lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
-import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import {SignatureChecker} from "lib/openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+
 import {EIP712} from "./external/EIP712.sol";
 
 /// @notice Marketplace contract that allows the execution of signed Trades.
