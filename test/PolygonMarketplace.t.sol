@@ -26,6 +26,19 @@ contract PolygonMarketplaceHarness is PolygonMarketplace {
     function eip712TradeHash(Trade memory _trade) external view returns (bytes32) {
         return _hashTypedDataV4(_hashTrade(_trade));
     }
+
+    function eip712MetaTransactionHash(MetaTransaction memory _metaTx) external view returns (bytes32) {
+        return _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    keccak256(bytes("MetaTransaction(uint256 nonce,address from,bytes functionData)")),
+                    _metaTx.nonce,
+                    _metaTx.from,
+                    keccak256(_metaTx.functionData)
+                )
+            )
+        );
+    }
 }
 
 abstract contract PolygonMarketplaceTests is Test {
@@ -421,5 +434,71 @@ contract TransferCollectionItemTests is PolygonMarketplaceTests {
         marketplace.accept(trades);
 
         assertEq(collection.ownerOf(expectedTokenId), signer.addr);
+    }
+}
+
+contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
+    VmSafe.Wallet metaTxSigner;
+
+    event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
+
+    function setUp() public override {
+        super.setUp();
+        metaTxSigner = vm.createWallet("metaTxSigner");
+    }
+
+    function signMetaTx(PolygonMarketplace.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_metaTx));
+
+        return abi.encodePacked(r, s, v);
+    }
+
+    function test_RevertsIfNonceIsInvalid() public {
+        Marketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].signature = signTrade(trades[0]);
+
+        PolygonMarketplace.MetaTransaction memory metaTx;
+        metaTx.nonce = 1;
+        metaTx.from = metaTxSigner.addr;
+        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+
+        bytes memory metaTxSignature = signMetaTx(metaTx);
+
+        vm.prank(other);
+        vm.expectRevert("NativeMetaTransaction#executeMetaTransaction: SIGNER_AND_SIGNATURE_DO_NOT_MATCH");
+        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+    }
+
+    function test_RevertsIfFromIsInvalid() public {
+        Marketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].signature = signTrade(trades[0]);
+
+        PolygonMarketplace.MetaTransaction memory metaTx;
+        metaTx.nonce = 0;
+        metaTx.from = other;
+        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+
+        bytes memory metaTxSignature = signMetaTx(metaTx);
+
+        vm.prank(other);
+        vm.expectRevert("NativeMetaTransaction#executeMetaTransaction: SIGNER_AND_SIGNATURE_DO_NOT_MATCH");
+        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+    }
+
+    function test_EmitMetaTransactionExecutedEvent() public {
+        Marketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].signature = signTrade(trades[0]);
+
+        PolygonMarketplace.MetaTransaction memory metaTx;
+        metaTx.nonce = 0;
+        metaTx.from = metaTxSigner.addr;
+        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+
+        bytes memory metaTxSignature = signMetaTx(metaTx);
+
+        vm.prank(other);
+        vm.expectEmit(address(marketplace));
+        emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
+        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
     }
 }
