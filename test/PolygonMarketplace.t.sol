@@ -442,6 +442,9 @@ contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
 
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
 
+    error Expired();
+    error MetaTransactionFailedWithoutReason();
+
     function setUp() public override {
         super.setUp();
         metaTxSigner = vm.createWallet("metaTxSigner");
@@ -499,6 +502,43 @@ contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
         vm.prank(other);
         vm.expectEmit(address(marketplace));
         emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
+        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+    }
+
+    function test_RevertsIfTradeIsExpiredWithBubbledUpError() public {
+        Marketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].expiration = block.timestamp - 1;
+        trades[0].signature = signTrade(trades[0]);
+
+        PolygonMarketplace.MetaTransaction memory metaTx;
+        metaTx.nonce = 0;
+        metaTx.from = metaTxSigner.addr;
+        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+
+        bytes memory metaTxSignature = signMetaTx(metaTx);
+
+        vm.prank(other);
+        vm.expectRevert(Expired.selector);
+        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+    }
+
+    function test_RevertsIfERC721AssetHasContractAddressZeroWithWithoutReasonError() public {
+        Marketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].sent = new Marketplace.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.ERC721_ID();
+        trades[0].sent[0].contractAddress = address(0);
+        trades[0].sent[0].value = 1;
+        trades[0].signature = signTrade(trades[0]);
+
+        PolygonMarketplace.MetaTransaction memory metaTx;
+        metaTx.nonce = 0;
+        metaTx.from = metaTxSigner.addr;
+        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+
+        bytes memory metaTxSignature = signMetaTx(metaTx);
+
+        vm.prank(other);
+        vm.expectRevert(MetaTransactionFailedWithoutReason.selector);
         marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
     }
 }
