@@ -34,6 +34,8 @@ abstract contract NativeMetaTransaction is EIP712 {
 
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
 
+    error MetaTransactionFailedWithoutReason();
+
     /// @notice Get the current nonce of a given signer.
     /// @param _signer The address of the signer.
     /// @return The current nonce of the signer.
@@ -63,14 +65,18 @@ abstract contract NativeMetaTransaction is EIP712 {
 
         (bool success, bytes memory returnData) = address(this).call{value: msg.value}(abi.encodePacked(_functionData, _userAddress));
 
-        // Bubble up error based on https://ethereum.stackexchange.com/a/83577
         if (!success) {
-            assembly {
-                // Slice the sighash.
-                returnData := add(returnData, 0x04)
+            if (returnData.length > 0) {
+                assembly {
+                    // The first 32 bytes of the bytes data is its length
+                    let returnDataSize := mload(returnData)
+                    // Move the pointer 32 bytes to ignore the length of the bytes data,
+                    // Revert with the actual error message.
+                    revert(add(32, returnData), returnDataSize)
+                }
+            } else {
+                revert MetaTransactionFailedWithoutReason();
             }
-
-            revert(abi.decode(returnData, (string)));
         }
 
         return returnData;
