@@ -14,15 +14,20 @@ import {EIP712} from "./external/EIP712.sol";
 /// @notice Marketplace contract that allows the execution of signed Trades.
 /// Users can sign a Trade indicating which assets are to be traded. Another user can the accept the Trade using the signature, executing the exchange if all checks are valid.
 abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
-    /// @dev Type hashes for Trade signatures following the EIP712 standard.
-    /// keccak256("ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
-    bytes32 private constant EXTERNAL_CHECK_TYPE_HASH = 0xdf361982fbc6415130c9d78e2e25ec087cf4812d4c0714d41cc56537ee15ac24;
-    /// keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
+    // keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
     bytes32 private constant ASSET_WO_BENEFICIARY_TYPE_HASH = 0x7be57332caf51c5f0f0fa0e7c362534d22d81c0bee1ffac9b573acd336e032bd;
-    /// keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)")
+
+    // keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)")
     bytes32 private constant ASSET_TYPE_HASH = 0xe5f9e1ebc316d1bde562c77f47da7dc2cccb903eb04f9b82e29212b96f9e57e1;
-    /// keccak256("Trade(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
-    bytes32 private constant TRADE_TYPE_HASH = 0x3bf794c19d5d3d6a9c2a4b72cee8af0cf4cc44b1e251db6b41a0f496b3e1efc6;
+
+    // keccak256("ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
+    bytes32 private constant EXTERNAL_CHECK_TYPE_HASH = 0xdf361982fbc6415130c9d78e2e25ec087cf4812d4c0714d41cc56537ee15ac24;
+
+    // keccak256("Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
+    bytes32 private constant CHECKS_TYPE_HASH = 0x2f962336c5429beb00c5ed44703aebcb2aaf2600ba276ef74dc82ca3bc073651;
+
+    // keccak256("Trade(Checks checks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
+    bytes32 private constant TRADE_TYPE_HASH = 0x6a9beda065389ec62818727007cff89069ad7a2ae71cc72612ba2b563a009bfe;
 
     /// @dev Selectors used to identify the functions to be called on external checks.
     /// bytes4(keccak256("balanceOf(address)"))
@@ -102,9 +107,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         bool required;
     }
 
-    /// @dev Schema for a Trade.
-    /// @param signer - The address of the user that signed the Trade.
-    /// @param signature - The signature of the Trade.
+    /// @dev Schema for base signature validation params.
     /// @param uses - How many times the signature can be used. 0 means it can be used indefinitely.
     /// @param expiration - The timestamp when the signature expires.
     /// @param effective - The timestamp when the signature can be used.
@@ -113,11 +116,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @param signerSignatureIndex - The signer signature index that was used to sign the Trade.
     /// @param allowed - An array of addresses that are allowed to accept the Trade. An empty array means any address can accept it.
     /// @param externalChecks - An array of external checks that need to be validated to accept the Trade. An empty array means no checks are required.
-    /// @param sent - An array of assets that the signer is sending in the Trade.
-    /// @param received - An array of assets that the signer is receiving in the Trade.
-    struct Trade {
-        address signer;
-        bytes signature;
+    struct Checks {
         uint256 uses;
         uint256 expiration;
         uint256 effective;
@@ -126,6 +125,18 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         uint256 signerSignatureIndex;
         address[] allowed;
         ExternalCheck[] externalChecks;
+    }
+
+    /// @dev Schema for a Trade.
+    /// @param signer - The address of the user that signed the Trade.
+    /// @param signature - The signature of the Trade.
+    /// @param checks - The checks that need to be validated to accept the Trade.
+    /// @param sent - An array of assets that the signer is sending in the Trade.
+    /// @param received - An array of assets that the signer is receiving in the Trade.
+    struct Trade {
+        address signer;
+        bytes signature;
+        Checks checks;
         Asset[] sent;
         Asset[] received;
     }
@@ -201,66 +212,37 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
             Trade memory trade = _trades[i];
 
             bytes32 hashedSignature = keccak256(trade.signature);
+            address signer = trade.signer;
+            bytes32 tradeId = getTradeId(trade, caller);
+            uint256 currentSignatureUses = signatureUses[hashedSignature];
 
             if (cancelledSignatures[hashedSignature]) {
                 revert CancelledSignature();
             }
 
-            uint256 storedSignatureUses = signatureUses[hashedSignature]++;
-
-            if (trade.uses > 0 && storedSignatureUses >= trade.uses) {
-                revert SignatureReuse();
-            }
-
-            bytes32 tradeId = getTradeId(trade, caller);
-
             if (usedTradeIds[tradeId]) {
                 revert UsedTradeId();
             }
 
-            if (trade.effective > block.timestamp) {
-                revert NotEffective();
-            }
-
-            if (contractSignatureIndex != trade.contractSignatureIndex) {
-                revert InvalidContractSignatureIndex();
-            }
-
-            address signer = trade.signer;
-
-            if (signerSignatureIndex[signer] != trade.signerSignatureIndex) {
-                revert InvalidSignerSignatureIndex();
-            }
-
-            if (trade.expiration < block.timestamp) {
-                revert Expired();
-            }
-
-            if (trade.allowed.length > 0) {
-                _verifyAllowed(trade.allowed, caller);
-            }
-
-            if (trade.externalChecks.length > 0) {
-                _verifyExternalChecks(trade.externalChecks, caller);
-            }
-
+            _verifyChecks(trade.checks, currentSignatureUses, signer, caller);
             _verifyTradeSignature(trade, signer);
 
-            if (storedSignatureUses + 1 == trade.uses) {
+            if (currentSignatureUses + 1 == trade.checks.uses) {
                 usedTradeIds[tradeId] = true;
             }
+
+            signatureUses[hashedSignature]++;
 
             emit Traded(caller, hashedSignature);
 
             _transferAssets(trade.sent, signer, caller, signer);
-
             _transferAssets(trade.received, caller, signer, signer);
         }
     }
 
     /// @dev Generates a trade id from a Trade's salt, the msg.sender of the transaction, and the received assets.
     function getTradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
-        bytes32 tradeId = keccak256(abi.encodePacked(_trade.salt, _caller));
+        bytes32 tradeId = keccak256(abi.encodePacked(_trade.checks.salt, _caller));
 
         for (uint256 i = 0; i < _trade.received.length; i++) {
             Asset memory asset = _trade.received[i];
@@ -277,16 +259,25 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         return keccak256(
             abi.encode(
                 TRADE_TYPE_HASH,
-                _trade.uses,
-                _trade.expiration,
-                _trade.effective,
-                _trade.salt,
-                _trade.contractSignatureIndex,
-                _trade.signerSignatureIndex,
-                keccak256(abi.encodePacked(_trade.allowed)),
-                keccak256(abi.encodePacked(_hashExternalChecks(_trade.externalChecks))),
+                keccak256(abi.encodePacked(_hashChecks(_trade.checks))),
                 keccak256(abi.encodePacked(_hashAssetsWithoutBeneficiary(_trade.sent))),
                 keccak256(abi.encodePacked(_hashAssets(_trade.received)))
+            )
+        );
+    }
+
+    function _hashChecks(Checks memory _checks) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                CHECKS_TYPE_HASH,
+                _checks.uses,
+                _checks.expiration,
+                _checks.effective,
+                _checks.salt,
+                _checks.contractSignatureIndex,
+                _checks.signerSignatureIndex,
+                keccak256(abi.encodePacked(_checks.allowed)),
+                keccak256(abi.encodePacked(_hashExternalChecks(_checks.externalChecks)))
             )
         );
     }
@@ -333,6 +324,36 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         }
 
         return hashes;
+    }
+
+    function _verifyChecks(Checks memory _checks, uint256 _currentSignatureUses, address _signer, address _caller) private view {
+        if (_checks.uses > 0 && _currentSignatureUses >= _checks.uses) {
+            revert SignatureReuse();
+        }
+
+        if (_checks.effective > block.timestamp) {
+            revert NotEffective();
+        }
+
+        if (contractSignatureIndex != _checks.contractSignatureIndex) {
+            revert InvalidContractSignatureIndex();
+        }
+
+        if (signerSignatureIndex[_signer] != _checks.signerSignatureIndex) {
+            revert InvalidSignerSignatureIndex();
+        }
+
+        if (_checks.expiration < block.timestamp) {
+            revert Expired();
+        }
+
+        if (_checks.allowed.length > 0) {
+            _verifyAllowed(_checks.allowed, _caller);
+        }
+
+        if (_checks.externalChecks.length > 0) {
+            _verifyExternalChecks(_checks.externalChecks, _caller);
+        }
     }
 
     function _verifyAllowed(address[] memory _allowed, address _caller) private pure {

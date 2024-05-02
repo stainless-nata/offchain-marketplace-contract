@@ -65,7 +65,7 @@ abstract contract PolygonMarketplaceTests is Test {
 
     function _getBaseTrades() internal view virtual returns (Marketplace.Trade[] memory) {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].signer = signer.addr;
         return trades;
     }
@@ -507,7 +507,7 @@ contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
 
     function test_RevertsIfTradeIsExpiredWithBubbledUpError() public {
         Marketplace.Trade[] memory trades = _getBaseTrades();
-        trades[0].expiration = block.timestamp - 1;
+        trades[0].checks.expiration = block.timestamp - 1;
         trades[0].signature = signTrade(trades[0]);
 
         PolygonMarketplace.MetaTransaction memory metaTx;

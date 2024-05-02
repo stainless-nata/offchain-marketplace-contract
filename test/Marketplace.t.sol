@@ -258,7 +258,7 @@ contract CancelSignatureTests is MarketplaceTests {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](10);
 
         for (uint256 i = 0; i < trades.length; i++) {
-            trades[i].salt = bytes32(i);
+            trades[i].checks.salt = bytes32(i);
             trades[i].signature = signTrade(trades[i]);
 
             assertEq(marketplace.cancelledSignatures(keccak256(trades[i].signature)), false);
@@ -276,7 +276,7 @@ contract CancelSignatureTests is MarketplaceTests {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](10);
 
         for (uint256 i = 0; i < trades.length; i++) {
-            trades[i].salt = bytes32(i);
+            trades[i].checks.salt = bytes32(i);
             trades[i].signature = signTrade(trades[i]);
         }
 
@@ -348,15 +348,15 @@ contract AcceptTests is MarketplaceTests {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
         trades[0].signer = signer.addr;
-        trades[0].uses = 1;
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].signature = signTrade(trades[0]);
 
         vm.prank(other);
         marketplace.accept(trades);
 
         vm.prank(other);
-        vm.expectRevert(SignatureReuse.selector);
+        vm.expectRevert(UsedTradeId.selector);
         marketplace.accept(trades);
     }
 
@@ -364,8 +364,8 @@ contract AcceptTests is MarketplaceTests {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
         trades[0].signer = signer.addr;
-        trades[0].uses = 0;
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.uses = 0;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].signature = signTrade(trades[0]);
 
         for (uint256 i = 0; i < 1000; i++) {
@@ -378,17 +378,17 @@ contract AcceptTests is MarketplaceTests {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
         trades[0].signer = signer.addr;
-        trades[0].uses = 10;
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.uses = 10;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].signature = signTrade(trades[0]);
 
-        for (uint256 i = 0; i < trades[0].uses; i++) {
+        for (uint256 i = 0; i < trades[0].checks.uses; i++) {
             vm.prank(other);
             marketplace.accept(trades);
         }
 
         vm.prank(other);
-        vm.expectRevert(SignatureReuse.selector);
+        vm.expectRevert(UsedTradeId.selector);
         marketplace.accept(trades);
     }
 
@@ -396,11 +396,11 @@ contract AcceptTests is MarketplaceTests {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
         trades[0].signer = signer.addr;
-        trades[0].uses = 3;
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.uses = 3;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].signature = signTrade(trades[0]);
 
-        for (uint256 i = 0; i < trades[0].uses; i++) {
+        for (uint256 i = 0; i < trades[0].checks.uses; i++) {
             assertEq(marketplace.usedTradeIds(marketplace.getTradeId(trades[0], other)), false);
 
             vm.prank(other);
@@ -414,14 +414,14 @@ contract AcceptTests is MarketplaceTests {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
         trades[0].signer = signer.addr;
-        trades[0].uses = 1;
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.uses = 1;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].signature = signTrade(trades[0]);
 
         vm.prank(other);
         marketplace.accept(trades);
 
-        trades[0].uses = 2;
+        trades[0].checks.uses = 2;
         trades[0].signature = signTrade(trades[0]);
 
         vm.prank(other);
@@ -432,7 +432,7 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfTradeIsNotEffectiveYet() public {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].effective = block.timestamp + 1;
+        trades[0].checks.effective = block.timestamp + 1;
 
         vm.prank(other);
         vm.expectRevert(NotEffective.selector);
@@ -442,7 +442,7 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfContractSignatureIndexIsInvalid() public {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].contractSignatureIndex = 1;
+        trades[0].checks.contractSignatureIndex = 1;
 
         vm.prank(other);
         vm.expectRevert(InvalidContractSignatureIndex.selector);
@@ -452,7 +452,7 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfSignerSignatureIndexIsInvalid() public {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].signerSignatureIndex = 1;
+        trades[0].checks.signerSignatureIndex = 1;
 
         vm.prank(other);
         vm.expectRevert(InvalidSignerSignatureIndex.selector);
@@ -462,7 +462,7 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfTradeHasExpired() public {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp - 1;
+        trades[0].checks.expiration = block.timestamp - 1;
 
         vm.prank(other);
         vm.expectRevert(Expired.selector);
@@ -472,11 +472,11 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfCallerNotAllowed() public {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
-        trades[0].allowed = new address[](100);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.allowed = new address[](100);
 
-        for (uint256 i = 0; i < trades[0].allowed.length; i++) {
-            trades[0].allowed[i] = vm.addr(i + 100);
+        for (uint256 i = 0; i < trades[0].checks.allowed.length; i++) {
+            trades[0].checks.allowed[i] = vm.addr(i + 100);
         }
 
         vm.prank(other);
@@ -487,17 +487,17 @@ contract AcceptTests is MarketplaceTests {
     function test_CallerCanAcceptIfItIsInTheAllowedList() public {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
-        trades[0].allowed = new address[](100);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.allowed = new address[](100);
 
-        for (uint256 i = 0; i < trades[0].allowed.length; i++) {
-            trades[0].allowed[i] = vm.addr(i + 100); // 100 is an offset to avoid conflicts with other addresses.
+        for (uint256 i = 0; i < trades[0].checks.allowed.length; i++) {
+            trades[0].checks.allowed[i] = vm.addr(i + 100); // 100 is an offset to avoid conflicts with other addresses.
         }
 
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
 
-        vm.prank(trades[0].allowed[trades[0].allowed.length - 1]);
+        vm.prank(trades[0].checks.allowed[trades[0].checks.allowed.length - 1]);
         marketplace.accept(trades);
     }
 
@@ -506,14 +506,14 @@ contract AcceptTests is MarketplaceTests {
 
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
 
-        trades[0].externalChecks = new Marketplace.ExternalCheck[](1);
+        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](1);
 
-        trades[0].externalChecks[0].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].externalChecks[0].value = 1;
-        trades[0].externalChecks[0].required = true;
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
+        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].required = true;
 
         mockExternalChecks.setBalanceOfResult(0);
 
@@ -527,14 +527,14 @@ contract AcceptTests is MarketplaceTests {
 
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
 
-        trades[0].externalChecks = new Marketplace.ExternalCheck[](1);
+        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](1);
 
-        trades[0].externalChecks[0].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[0].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].externalChecks[0].value = 1;
-        trades[0].externalChecks[0].required = true;
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.ownerOf.selector;
+        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].required = true;
 
         mockExternalChecks.setOwnerOfResult(signer.addr);
 
@@ -548,13 +548,13 @@ contract AcceptTests is MarketplaceTests {
 
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
 
-        trades[0].externalChecks = new Marketplace.ExternalCheck[](1);
+        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](1);
 
-        trades[0].externalChecks[0].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[0].selector = mockExternalChecks.customCheckFunction.selector;
-        trades[0].externalChecks[0].required = true;
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.customCheckFunction.selector;
+        trades[0].checks.externalChecks[0].required = true;
 
         mockExternalChecks.setCustomCheckFunctionResult(false);
 
@@ -568,19 +568,19 @@ contract AcceptTests is MarketplaceTests {
 
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
 
-        trades[0].externalChecks = new Marketplace.ExternalCheck[](2);
+        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](2);
 
-        trades[0].externalChecks[0].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].externalChecks[0].value = 1;
-        trades[0].externalChecks[0].required = true;
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
+        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].required = true;
 
-        trades[0].externalChecks[1].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].externalChecks[1].value = 1;
-        trades[0].externalChecks[1].required = true;
+        trades[0].checks.externalChecks[1].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
+        trades[0].checks.externalChecks[1].value = 1;
+        trades[0].checks.externalChecks[1].required = true;
 
         mockExternalChecks.setBalanceOfResult(1); // pass
         mockExternalChecks.setOwnerOfResult(signer.addr); // fail
@@ -595,19 +595,19 @@ contract AcceptTests is MarketplaceTests {
 
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
 
-        trades[0].externalChecks = new Marketplace.ExternalCheck[](2);
+        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](2);
 
-        trades[0].externalChecks[0].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].externalChecks[0].value = 1;
-        trades[0].externalChecks[0].required = true;
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
+        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].required = true;
 
-        trades[0].externalChecks[1].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].externalChecks[1].value = 1;
-        trades[0].externalChecks[1].required = false;
+        trades[0].checks.externalChecks[1].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
+        trades[0].checks.externalChecks[1].value = 1;
+        trades[0].checks.externalChecks[1].required = false;
 
         mockExternalChecks.setBalanceOfResult(1); // pass
         mockExternalChecks.setOwnerOfResult(signer.addr); // fail
@@ -622,19 +622,19 @@ contract AcceptTests is MarketplaceTests {
 
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
 
-        trades[0].externalChecks = new Marketplace.ExternalCheck[](2);
+        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](2);
 
-        trades[0].externalChecks[0].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].externalChecks[0].value = 1;
-        trades[0].externalChecks[0].required = false;
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
+        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].required = false;
 
-        trades[0].externalChecks[1].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].externalChecks[1].value = 1;
-        trades[0].externalChecks[1].required = false;
+        trades[0].checks.externalChecks[1].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
+        trades[0].checks.externalChecks[1].value = 1;
+        trades[0].checks.externalChecks[1].required = false;
 
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
@@ -651,19 +651,19 @@ contract AcceptTests is MarketplaceTests {
 
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
 
-        trades[0].externalChecks = new Marketplace.ExternalCheck[](2);
+        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](2);
 
-        trades[0].externalChecks[0].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
-        trades[0].externalChecks[0].value = 1;
-        trades[0].externalChecks[0].required = true;
+        trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
+        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].required = true;
 
-        trades[0].externalChecks[1].contractAddress = address(mockExternalChecks);
-        trades[0].externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
-        trades[0].externalChecks[1].value = 1;
-        trades[0].externalChecks[1].required = true;
+        trades[0].checks.externalChecks[1].contractAddress = address(mockExternalChecks);
+        trades[0].checks.externalChecks[1].selector = mockExternalChecks.ownerOf.selector;
+        trades[0].checks.externalChecks[1].value = 1;
+        trades[0].checks.externalChecks[1].required = true;
 
         mockExternalChecks.setBalanceOfResult(1); // pass
         mockExternalChecks.setOwnerOfResult(other); // pass
@@ -678,7 +678,7 @@ contract AcceptTests is MarketplaceTests {
     function test_EmitTradedEvent() public {
         Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
 
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
 

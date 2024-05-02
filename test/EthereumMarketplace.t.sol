@@ -46,7 +46,7 @@ abstract contract EthereumMarketplaceTests is Test {
 
     function _getBaseTrades() internal view virtual returns (EthereumMarketplace.Trade[] memory) {
         EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].signer = signer.addr;
         return trades;
     }
@@ -483,7 +483,7 @@ contract ExampleTests is EthereumMarketplaceTests {
         mana.transfer(other, manaOriginalHolderBalance);
 
         EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].sent = new EthereumMarketplace.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ERC721_ID();
         trades[0].sent[0].contractAddress = address(land);
@@ -527,12 +527,12 @@ contract ExampleTests is EthereumMarketplaceTests {
         mana.transfer(other, manaOriginalHolderBalance);
 
         EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
-        trades[0].expiration = block.timestamp;
-        trades[0].externalChecks = new EthereumMarketplace.ExternalCheck[](1);
-        trades[0].externalChecks[0].contractAddress = address(names);
-        trades[0].externalChecks[0].value = 1;
-        trades[0].externalChecks[0].selector = names.balanceOf.selector;
-        trades[0].externalChecks[0].required = true;
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.externalChecks = new EthereumMarketplace.ExternalCheck[](1);
+        trades[0].checks.externalChecks[0].contractAddress = address(names);
+        trades[0].checks.externalChecks[0].value = 1;
+        trades[0].checks.externalChecks[0].selector = names.balanceOf.selector;
+        trades[0].checks.externalChecks[0].required = true;
         trades[0].sent = new EthereumMarketplace.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ERC721_ID();
         trades[0].sent[0].contractAddress = address(land);
@@ -594,7 +594,7 @@ contract ExampleTests is EthereumMarketplaceTests {
         mana.transfer(other, manaOriginalHolderBalance);
 
         EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].sent = new EthereumMarketplace.Asset[](3);
         trades[0].sent[0].assetType = marketplace.ERC721_ID();
         trades[0].sent[0].contractAddress = address(land);
@@ -653,7 +653,7 @@ contract ExampleTests is EthereumMarketplaceTests {
         estate.transferFrom(estateOriginalOwner, signer.addr, estateTokenId);
 
         EthereumMarketplace.Trade[] memory trades = new EthereumMarketplace.Trade[](1);
-        trades[0].expiration = block.timestamp;
+        trades[0].checks.expiration = block.timestamp;
         trades[0].sent = new EthereumMarketplace.Asset[](1);
         trades[0].sent[0].assetType = marketplace.COMPOSABLE_ERC721_ID();
         trades[0].sent[0].contractAddress = address(estate);
