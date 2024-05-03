@@ -31,6 +31,10 @@ contract PolygonMarketplace is Marketplace, NativeMetaTransaction, SimpleTokenTr
         }
     }
 
+    function _applyModifier(Trade memory, Modifier memory) internal pure override {
+        
+    }
+
     function _msgSender() internal view override returns (address sender) {
         return _getMsgSender();
     }

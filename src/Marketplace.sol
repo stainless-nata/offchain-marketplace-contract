@@ -29,6 +29,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     // keccak256("Trade(Checks checks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
     bytes32 private constant TRADE_TYPE_HASH = 0x6a9beda065389ec62818727007cff89069ad7a2ae71cc72612ba2b563a009bfe;
 
+    // keccak256("Modifier(Checks checks,uint256 modifierType,bytes data)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
+    bytes32 private constant MODIFIER_TYPE_HASH = 0x5f8554ec0f2e85d95d0a1c8b4b287d433c736606ae28b55167c9bc7caa0c4a19;
+
     /// @dev Selectors used to identify the functions to be called on external checks.
     /// bytes4(keccak256("balanceOf(address)"))
     bytes4 private constant BALANCE_OF_SELECTOR = 0x70a08231;
@@ -141,6 +144,18 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         Asset[] received;
     }
 
+    /// @dev Schema for a Trade modifier.
+    /// @param signature - The signature of the modifier.
+    /// @param checks - The checks that need to be validated to accept the modifier.
+    /// @param modifierType - The type of modifier.
+    /// @param data - The data of the modifier.
+    struct Modifier {
+        bytes signature;
+        Checks checks;
+        uint256 modifierType;
+        bytes data;
+    }
+
     event ContractSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
     event SignerSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
     event SignatureCancelled(address indexed _caller, bytes32 indexed _signature);
@@ -156,6 +171,7 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     error NotAllowed();
     error ExternalChecksFailed();
     error InvalidSignature();
+    error TradesAndModifiersLengthMismatch();
 
     constructor(address _owner) EIP712("Marketplace", "1.0.0") Ownable(_owner) {}
 
@@ -209,35 +225,65 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         address caller = _msgSender();
 
         for (uint256 i = 0; i < _trades.length; i++) {
-            Trade memory trade = _trades[i];
+            _accept(_trades[i], caller);
+        }
+    }
 
-            bytes32 hashedSignature = keccak256(trade.signature);
+    /// @notice Accepts a Trade after applying a Modification.
+    /// @param _trades - An array of Trades to be accepted.
+    /// @param _modifiers - An array of Modifiers to be applied to the Trades.
+    function acceptWithModifier(Trade[] calldata _trades, Modifier[] calldata _modifiers) external whenNotPaused nonReentrant {
+        address caller = _msgSender();
+
+        if (_trades.length != _modifiers.length) {
+            revert TradesAndModifiersLengthMismatch();
+        }
+
+        for (uint256 i = 0; i < _trades.length; i++) {
+            Trade memory trade = _trades[i];
+            Modifier memory mod = _modifiers[i];
+
+            bytes32 hashedSignature = keccak256(mod.signature);
             address signer = trade.signer;
-            bytes32 tradeId = getTradeId(trade, caller);
             uint256 currentSignatureUses = signatureUses[hashedSignature];
 
-            if (cancelledSignatures[hashedSignature]) {
-                revert CancelledSignature();
-            }
-
-            if (usedTradeIds[tradeId]) {
-                revert UsedTradeId();
-            }
-
-            _verifyChecks(trade.checks, currentSignatureUses, signer, caller);
-            _verifyTradeSignature(trade, signer);
-
-            if (currentSignatureUses + 1 == trade.checks.uses) {
-                usedTradeIds[tradeId] = true;
-            }
+            _verifyChecks(mod.checks, currentSignatureUses, signer, caller);
+            _verifyModifierSignature(mod, signer);
 
             signatureUses[hashedSignature]++;
 
-            emit Traded(caller, hashedSignature);
-
-            _transferAssets(trade.sent, signer, caller, signer);
-            _transferAssets(trade.received, caller, signer, signer);
+            _applyModifier(trade, mod);
+            _accept(trade, caller);
         }
+    }
+
+    function _accept(Trade memory _trade, address _caller) private {
+        bytes32 hashedSignature = keccak256(_trade.signature);
+        address signer = _trade.signer;
+        bytes32 tradeId = getTradeId(_trade, _caller);
+        uint256 currentSignatureUses = signatureUses[hashedSignature];
+
+        if (cancelledSignatures[hashedSignature]) {
+            revert CancelledSignature();
+        }
+
+        if (usedTradeIds[tradeId]) {
+            revert UsedTradeId();
+        }
+
+        _verifyChecks(_trade.checks, currentSignatureUses, signer, _caller);
+        _verifyTradeSignature(_trade, signer);
+
+        if (currentSignatureUses + 1 == _trade.checks.uses) {
+            usedTradeIds[tradeId] = true;
+        }
+
+        signatureUses[hashedSignature]++;
+
+        emit Traded(_caller, hashedSignature);
+
+        _transferAssets(_trade.sent, signer, _caller, signer);
+        _transferAssets(_trade.received, _caller, signer, signer);
     }
 
     /// @dev Generates a trade id from a Trade's salt, the msg.sender of the transaction, and the received assets.
@@ -251,79 +297,6 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
         }
 
         return tradeId;
-    }
-
-    /// @dev Hashes a Trade according to the EIP712 standard.
-    /// Used to validate that the signer provided in the Trade is the one that signed it.
-    function _hashTrade(Trade memory _trade) internal pure returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                TRADE_TYPE_HASH,
-                keccak256(abi.encodePacked(_hashChecks(_trade.checks))),
-                keccak256(abi.encodePacked(_hashAssetsWithoutBeneficiary(_trade.sent))),
-                keccak256(abi.encodePacked(_hashAssets(_trade.received)))
-            )
-        );
-    }
-
-    function _hashChecks(Checks memory _checks) internal pure returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                CHECKS_TYPE_HASH,
-                _checks.uses,
-                _checks.expiration,
-                _checks.effective,
-                _checks.salt,
-                _checks.contractSignatureIndex,
-                _checks.signerSignatureIndex,
-                keccak256(abi.encodePacked(_checks.allowed)),
-                keccak256(abi.encodePacked(_hashExternalChecks(_checks.externalChecks)))
-            )
-        );
-    }
-
-    /// @dev Hashes an array of assets without the beneficiary.
-    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32[] memory) {
-        bytes32[] memory hashes = new bytes32[](_assets.length);
-
-        for (uint256 i = 0; i < hashes.length; i++) {
-            Asset memory asset = _assets[i];
-
-            hashes[i] =
-                keccak256(abi.encode(ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra)));
-        }
-
-        return hashes;
-    }
-
-    /// @dev Hashes an array of assets.
-    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32[] memory) {
-        bytes32[] memory hashes = new bytes32[](_assets.length);
-
-        for (uint256 i = 0; i < hashes.length; i++) {
-            Asset memory asset = _assets[i];
-
-            hashes[i] =
-                keccak256(abi.encode(ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra), asset.beneficiary));
-        }
-
-        return hashes;
-    }
-
-    function _hashExternalChecks(ExternalCheck[] memory _externalChecks) private pure returns (bytes32[] memory) {
-        bytes32[] memory hashes = new bytes32[](_externalChecks.length);
-
-        for (uint256 i = 0; i < hashes.length; i++) {
-            ExternalCheck memory externalCheck = _externalChecks[i];
-
-            hashes[i] = keccak256(
-                abi.encode(
-                    EXTERNAL_CHECK_TYPE_HASH, externalCheck.contractAddress, externalCheck.selector, externalCheck.value, externalCheck.required
-                )
-            );
-        }
-
-        return hashes;
     }
 
     function _verifyChecks(Checks memory _checks, uint256 _currentSignatureUses, address _signer, address _caller) private view {
@@ -444,9 +417,99 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
 
     /// @dev Verifies that the signature provided in the Trade is valid.
     function _verifyTradeSignature(Trade memory _trade, address _signer) private view {
-        if (!SignatureChecker.isValidSignatureNow(_signer, _hashTypedDataV4(_hashTrade(_trade)), _trade.signature)) {
+        _verifySignature(_hashTrade(_trade), _trade.signature, _signer);
+    }
+
+    /// @dev Verifies that the signature provided in the Modifier is valid.
+    function _verifyModifierSignature(Modifier memory _modifier, address _signer) private view {
+        _verifySignature(_hashModifier(_modifier), _modifier.signature, _signer);
+    }
+
+    function _verifySignature(bytes32 _typeHash, bytes memory _signature, address _signer) private view {
+        if (!SignatureChecker.isValidSignatureNow(_signer, _hashTypedDataV4(_typeHash), _signature)) {
             revert InvalidSignature();
         }
+    }
+
+    /// @dev Hashes a Trade according to the EIP712 standard.
+    /// Used to validate that the signer provided in the Trade is the one that signed it.
+    function _hashTrade(Trade memory _trade) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                TRADE_TYPE_HASH,
+                keccak256(abi.encodePacked(_hashChecks(_trade.checks))),
+                keccak256(abi.encodePacked(_hashAssetsWithoutBeneficiary(_trade.sent))),
+                keccak256(abi.encodePacked(_hashAssets(_trade.received)))
+            )
+        );
+    }
+
+    function _hashChecks(Checks memory _checks) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                CHECKS_TYPE_HASH,
+                _checks.uses,
+                _checks.expiration,
+                _checks.effective,
+                _checks.salt,
+                _checks.contractSignatureIndex,
+                _checks.signerSignatureIndex,
+                keccak256(abi.encodePacked(_checks.allowed)),
+                keccak256(abi.encodePacked(_hashExternalChecks(_checks.externalChecks)))
+            )
+        );
+    }
+
+    /// @dev Hashes an array of assets without the beneficiary.
+    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32[] memory) {
+        bytes32[] memory hashes = new bytes32[](_assets.length);
+
+        for (uint256 i = 0; i < hashes.length; i++) {
+            Asset memory asset = _assets[i];
+
+            hashes[i] =
+                keccak256(abi.encode(ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra)));
+        }
+
+        return hashes;
+    }
+
+    /// @dev Hashes an array of assets.
+    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32[] memory) {
+        bytes32[] memory hashes = new bytes32[](_assets.length);
+
+        for (uint256 i = 0; i < hashes.length; i++) {
+            Asset memory asset = _assets[i];
+
+            hashes[i] =
+                keccak256(abi.encode(ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra), asset.beneficiary));
+        }
+
+        return hashes;
+    }
+
+    function _hashExternalChecks(ExternalCheck[] memory _externalChecks) private pure returns (bytes32[] memory) {
+        bytes32[] memory hashes = new bytes32[](_externalChecks.length);
+
+        for (uint256 i = 0; i < hashes.length; i++) {
+            ExternalCheck memory externalCheck = _externalChecks[i];
+
+            hashes[i] = keccak256(
+                abi.encode(
+                    EXTERNAL_CHECK_TYPE_HASH, externalCheck.contractAddress, externalCheck.selector, externalCheck.value, externalCheck.required
+                )
+            );
+        }
+
+        return hashes;
+    }
+
+    function _hashModifier(Modifier memory _modifier) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                MODIFIER_TYPE_HASH, keccak256(abi.encodePacked(_hashChecks(_modifier.checks))), _modifier.modifierType, keccak256(_modifier.data)
+            )
+        );
     }
 
     /// @dev Transfers an array of assets from one address to another.
@@ -468,4 +531,9 @@ abstract contract Marketplace is EIP712, Ownable, Pausable, ReentrancyGuard {
     /// @param _from - The address that is sending the asset.
     /// @param _signer - The signer of the Trade.
     function _transferAsset(Asset memory _asset, address _from, address _signer) internal virtual;
+
+    /// @dev This function needs to be implemented by the child contract to handle the application of the modifier.
+    /// @param _trade - The Trade to be modified.
+    /// @param _modifier - The modifier to be applied.
+    function _applyModifier(Trade memory _trade, Modifier memory _modifier) internal virtual;
 }
