@@ -3,22 +3,22 @@ pragma solidity ^0.8.20;
 
 abstract contract Structs {
     // keccak256("ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
-    bytes32 internal constant EXTERNAL_CHECK_TYPE_HASH = 0xdf361982fbc6415130c9d78e2e25ec087cf4812d4c0714d41cc56537ee15ac24;
+    bytes32 private constant EXTERNAL_CHECK_TYPE_HASH = 0xdf361982fbc6415130c9d78e2e25ec087cf4812d4c0714d41cc56537ee15ac24;
 
     // keccak256("Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
-    bytes32 internal constant CHECKS_TYPE_HASH = 0x2f962336c5429beb00c5ed44703aebcb2aaf2600ba276ef74dc82ca3bc073651;
+    bytes32 private constant CHECKS_TYPE_HASH = 0x2f962336c5429beb00c5ed44703aebcb2aaf2600ba276ef74dc82ca3bc073651;
 
     // keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
-    bytes32 internal constant ASSET_WO_BENEFICIARY_TYPE_HASH = 0x7be57332caf51c5f0f0fa0e7c362534d22d81c0bee1ffac9b573acd336e032bd;
+    bytes32 private constant ASSET_WO_BENEFICIARY_TYPE_HASH = 0x7be57332caf51c5f0f0fa0e7c362534d22d81c0bee1ffac9b573acd336e032bd;
 
     // keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)")
-    bytes32 internal constant ASSET_TYPE_HASH = 0xe5f9e1ebc316d1bde562c77f47da7dc2cccb903eb04f9b82e29212b96f9e57e1;
+    bytes32 private constant ASSET_TYPE_HASH = 0xe5f9e1ebc316d1bde562c77f47da7dc2cccb903eb04f9b82e29212b96f9e57e1;
 
     // keccak256("Trade(Checks checks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
-    bytes32 internal constant TRADE_TYPE_HASH = 0x6a9beda065389ec62818727007cff89069ad7a2ae71cc72612ba2b563a009bfe;
+    bytes32 private constant TRADE_TYPE_HASH = 0x6a9beda065389ec62818727007cff89069ad7a2ae71cc72612ba2b563a009bfe;
 
     // keccak256("Modifier(Checks checks,uint256 modifierType,bytes data)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
-    bytes32 internal constant MODIFIER_TYPE_HASH = 0x5f8554ec0f2e85d95d0a1c8b4b287d433c736606ae28b55167c9bc7caa0c4a19;
+    bytes32 private constant MODIFIER_TYPE_HASH = 0x5f8554ec0f2e85d95d0a1c8b4b287d433c736606ae28b55167c9bc7caa0c4a19;
 
     struct ExternalCheck {
         address contractAddress;
@@ -62,7 +62,7 @@ abstract contract Structs {
         bytes data;
     }
 
-    function _hashExternalChecks(ExternalCheck[] memory _externalChecks) internal pure returns (bytes32[] memory) {
+    function _hashExternalChecks(ExternalCheck[] memory _externalChecks) private pure returns (bytes32[] memory) {
         bytes32[] memory hashes = new bytes32[](_externalChecks.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
@@ -78,7 +78,7 @@ abstract contract Structs {
         return hashes;
     }
 
-    function _hashChecks(Checks memory _checks) internal pure returns (bytes32) {
+    function _hashChecks(Checks memory _checks) private pure returns (bytes32) {
         return keccak256(
             abi.encode(
                 CHECKS_TYPE_HASH,
@@ -94,7 +94,7 @@ abstract contract Structs {
         );
     }
 
-    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) internal pure returns (bytes32[] memory) {
+    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32[] memory) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
@@ -107,7 +107,7 @@ abstract contract Structs {
         return hashes;
     }
 
-    function _hashAssets(Asset[] memory _assets) internal pure returns (bytes32[] memory) {
+    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32[] memory) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
