@@ -13,7 +13,7 @@ contract EthereumMarketplace is Marketplace, SimpleTokenTransfer, ComposableToke
     error UnsupportedAssetType(uint256 _assetType);
     error ModifiersNotSupported();
 
-    constructor(address _owner) Marketplace(_owner) {}
+    constructor(address _owner) Marketplace(_owner, address(0)) {}
 
     function _transferAsset(Asset memory _asset, address _from, address) internal override {
         if (_asset.assetType == ERC20_ID) {
@@ -25,9 +25,5 @@ contract EthereumMarketplace is Marketplace, SimpleTokenTransfer, ComposableToke
         } else {
             revert UnsupportedAssetType(_asset.assetType);
         }
-    }
-
-    function _applyModifier(Trade memory, Modifier memory) internal override pure {
-        revert ModifiersNotSupported();
     }
 }

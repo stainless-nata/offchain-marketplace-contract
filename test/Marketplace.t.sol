@@ -9,7 +9,7 @@ import {Marketplace} from "../src/Marketplace.sol";
 import {MockExternalChecks} from "../src/mocks/MockExternalChecks.sol";
 
 contract MarketplaceHarness is Marketplace {
-    constructor(address _owner) Marketplace(_owner) {}
+    constructor(address _owner) Marketplace(_owner, address(0)) {}
 
     function eip712Name() external view returns (string memory) {
         return _EIP712Name();
@@ -24,8 +24,6 @@ contract MarketplaceHarness is Marketplace {
     }
 
     function _transferAsset(Asset memory _asset, address _from, address _signer) internal override {}
-
-    function _applyModifier(Trade memory _trade, Modifier memory _modifier) internal override {}
 }
 
 abstract contract MarketplaceTests is Test {

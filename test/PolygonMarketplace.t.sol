@@ -13,7 +13,7 @@ import {ICollectionStore} from "../src/interfaces/ICollectionStore.sol";
 import {ICollection} from "../src/interfaces/ICollection.sol";
 
 contract PolygonMarketplaceHarness is PolygonMarketplace {
-    constructor(address _owner, ICollectionStore _collectionStore) PolygonMarketplace(_owner, _collectionStore) {}
+    constructor(address _owner) PolygonMarketplace(_owner, address(0)) {}
 
     function eip712Name() external view returns (string memory) {
         return _EIP712Name();
@@ -52,10 +52,7 @@ abstract contract PolygonMarketplaceTests is Test {
 
         signer = vm.createWallet("signer");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
-        marketplace = new PolygonMarketplaceHarness(
-            0x0E659A116e161d8e502F9036bAbDA51334F2667E, // DAO Agent;
-            ICollectionStore(0x214ffC0f0103735728dc66b61A22e4F163e275ae)
-        );
+        marketplace = new PolygonMarketplaceHarness(0x0E659A116e161d8e502F9036bAbDA51334F2667E);
     }
 
     function signTrade(Marketplace.Trade memory _trade) internal view returns (bytes memory) {

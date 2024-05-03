@@ -2,8 +2,9 @@
 pragma solidity ^0.8.20;
 
 import {Signatures} from "./Signatures.sol";
+import {Structs} from "./Structs.sol";
 
-abstract contract Verifications is Signatures {
+abstract contract Verifications is Signatures, Structs {
     // keccak256("ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
     bytes32 private constant EXTERNAL_CHECK_TYPE_HASH = 0xdf361982fbc6415130c9d78e2e25ec087cf4812d4c0714d41cc56537ee15ac24;
 
@@ -15,24 +16,6 @@ abstract contract Verifications is Signatures {
 
     /// bytes4(keccak256("ownerOf(uint256)"))
     bytes4 private constant OWNER_OF_SELECTOR = 0x6352211e;
-
-    struct ExternalCheck {
-        address contractAddress;
-        bytes4 selector;
-        uint256 value;
-        bool required;
-    }
-
-    struct Checks {
-        uint256 uses;
-        uint256 expiration;
-        uint256 effective;
-        bytes32 salt;
-        uint256 contractSignatureIndex;
-        uint256 signerSignatureIndex;
-        address[] allowed;
-        ExternalCheck[] externalChecks;
-    }
 
     error NotEffective();
     error InvalidContractSignatureIndex();
