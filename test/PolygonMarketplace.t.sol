@@ -13,7 +13,7 @@ import {ICollectionStore} from "../src/interfaces/ICollectionStore.sol";
 import {ICollection} from "../src/interfaces/ICollection.sol";
 
 contract PolygonMarketplaceHarness is PolygonMarketplace {
-    constructor(address _owner) PolygonMarketplace(_owner, address(0)) {}
+    constructor(address _owner) PolygonMarketplace(_owner) {}
 
     function eip712Name() external view returns (string memory) {
         return _EIP712Name();

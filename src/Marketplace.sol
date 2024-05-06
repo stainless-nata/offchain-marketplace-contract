@@ -20,7 +20,7 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
     error UsedTradeId();
     error TradesAndModifiersLengthMismatch();
 
-    constructor(address _owner, address _modifiers) EIP712("Marketplace", "1.0.0") Ownable(_owner) {
+    constructor(address _modifiers) {
         modifiers = Modifiers(_modifiers);
     }
 
