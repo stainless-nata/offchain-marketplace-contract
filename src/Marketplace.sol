@@ -7,21 +7,21 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 import {EIP712} from "./external/EIP712.sol";
 import {Verifications} from "./common/Verifications.sol";
-import {Modifiers} from "./Modifiers.sol";
+import {Coupons} from "./Coupons.sol";
 
 /// @notice Marketplace contract that allows the execution of signed Trades.
 /// Users can sign a Trade indicating which assets are to be traded. Another user can the accept the Trade using the signature, executing the exchange if all checks are valid.
 abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
-    Modifiers public modifiers;
+    Coupons public coupons;
     mapping(bytes32 => bool) public usedTradeIds;
 
     event Traded(address indexed _caller, bytes32 indexed _signature);
 
     error UsedTradeId();
-    error TradesAndModifiersLengthMismatch();
+    error TradesAndCouponsLengthMismatch();
 
-    constructor(address _modifiers) {
-        modifiers = Modifiers(_modifiers);
+    constructor(address _coupons) {
+        coupons = Coupons(_coupons);
     }
 
     function pause() external onlyOwner {
@@ -54,15 +54,15 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
         }
     }
 
-    function acceptWithModifier(Trade[] calldata _trades, Modifier[] calldata _modifiers) external whenNotPaused nonReentrant {
+    function acceptWithCoupon(Trade[] calldata _trades, Coupon[] calldata _coupons) external whenNotPaused nonReentrant {
         address caller = _msgSender();
 
-        if (_trades.length != _modifiers.length) {
-            revert TradesAndModifiersLengthMismatch();
+        if (_trades.length != _coupons.length) {
+            revert TradesAndCouponsLengthMismatch();
         }
 
         for (uint256 i = 0; i < _trades.length; i++) {
-            _accept(modifiers.applyModifier(_trades[i], _modifiers[i]), caller);
+            _accept(coupons.applyCoupon(_trades[i], _coupons[i]), caller);
         }
     }
 

@@ -17,8 +17,8 @@ abstract contract Structs {
     // keccak256("Trade(Checks checks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
     bytes32 private constant TRADE_TYPE_HASH = 0x6a9beda065389ec62818727007cff89069ad7a2ae71cc72612ba2b563a009bfe;
 
-    // keccak256("Modifier(Checks checks,uint256 modifierType,bytes data)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
-    bytes32 private constant MODIFIER_TYPE_HASH = 0x5f8554ec0f2e85d95d0a1c8b4b287d433c736606ae28b55167c9bc7caa0c4a19;
+    // keccak256("Coupon(Checks checks,address couponImplementation,bytes data)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
+    bytes32 private constant COUPON_TYPE_HASH = 0x9da4cc9954c195e1c1401bd6fd134f8099228aaac02ebeaee879417d1d6bbf1a;
 
     struct ExternalCheck {
         address contractAddress;
@@ -55,10 +55,10 @@ abstract contract Structs {
         Asset[] received;
     }
 
-    struct Modifier {
+    struct Coupon {
         bytes signature;
         Checks checks;
-        uint256 modifierType;
+        address couponImplementation;
         bytes data;
     }
 
@@ -131,10 +131,10 @@ abstract contract Structs {
         );
     }
 
-    function _hashModifier(Modifier memory _modifier) internal pure returns (bytes32) {
+    function _hashModifier(Coupon memory _coupon) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                MODIFIER_TYPE_HASH, keccak256(abi.encodePacked(_hashChecks(_modifier.checks))), _modifier.modifierType, keccak256(_modifier.data)
+                COUPON_TYPE_HASH, keccak256(abi.encodePacked(_hashChecks(_coupon.checks))), _coupon.couponImplementation, keccak256(_coupon.data)
             )
         );
     }
