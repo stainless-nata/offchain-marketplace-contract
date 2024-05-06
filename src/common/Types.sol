@@ -44,7 +44,6 @@ abstract contract Types {
         uint256 value;
         address beneficiary;
         bytes extra;
-        bytes unverifiedExtra;
     }
 
     struct Trade {
@@ -60,6 +59,7 @@ abstract contract Types {
         Checks checks;
         address couponImplementation;
         bytes data;
+        bytes callerData;
     }
 
     function _hashExternalChecks(ExternalCheck[] memory _externalChecks) private pure returns (bytes32[] memory) {
