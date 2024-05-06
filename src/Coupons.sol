@@ -2,14 +2,14 @@
 pragma solidity ^0.8.20;
 
 import {Verifications} from "./common/Verifications.sol";
-import {Structs} from "./common/Structs.sol";
+import {Types} from "./common/Types.sol";
 
 interface ICouponImplementation {
-    function applyCoupon(Structs.Trade calldata _trade, Structs.Coupon calldata _coupon) external view returns (Structs.Trade memory);
+    function applyCoupon(Types.Trade calldata _trade, Types.Coupon calldata _coupon) external view returns (Types.Trade memory);
 }
 
 interface ICoupons {
-    function applyCoupon(Structs.Trade calldata _trade, Structs.Coupon calldata _coupon) external returns (Structs.Trade memory);
+    function applyCoupon(Types.Trade calldata _trade, Types.Coupon calldata _coupon) external returns (Types.Trade memory);
 }
 
 abstract contract Coupons is ICoupons, Verifications {

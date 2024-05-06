@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 import {Signatures} from "./Signatures.sol";
-import {Structs} from "./Structs.sol";
+import {Types} from "./Types.sol";
 
-abstract contract Verifications is Signatures, Structs {
+abstract contract Verifications is Signatures, Types {
     /// bytes4(keccak256("balanceOf(address)"))
     bytes4 private constant BALANCE_OF_SELECTOR = 0x70a08231;
 
