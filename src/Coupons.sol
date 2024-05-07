@@ -7,10 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Verifications} from "./common/Verifications.sol";
 import {Types} from "./common/Types.sol";
 import {EIP712} from "./external/EIP712.sol";
-
-interface ICouponImplementation {
-    function applyCoupon(Types.Trade calldata _trade, Types.Coupon calldata _coupon) external view returns (Types.Trade memory);
-}
+import {ICouponImplementation} from "./interfaces/ICouponImplementation.sol";
 
 interface ICoupons {
     function applyCoupon(Types.Trade calldata _trade, Types.Coupon calldata _coupon) external returns (Types.Trade memory);

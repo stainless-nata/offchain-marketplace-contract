@@ -6,6 +6,8 @@ import {VmSafe} from "forge-std/Vm.sol";
 
 import {Coupons} from "../src/Coupons.sol";
 import {Types} from "../src/common/Types.sol";
+import {ICouponImplementation} from "../src/interfaces/ICouponImplementation.sol";
+import {MockCouponImplementation} from "../src/mocks/MockCouponImplementation.sol";
 
 contract CouponsHarness is Coupons {
     constructor(address _marketplace, address _owner, address[] memory _allowedCouponImplementations)
@@ -24,13 +26,15 @@ abstract contract CouponsTests is Test {
     address other;
     VmSafe.Wallet signer;
     CouponsHarness coupons;
+    ICouponImplementation couponImplementation;
 
     error OwnableUnauthorizedAccount(address account);
 
     function setUp() public {
         marketplace = address(1);
         owner = address(2);
-        allowedCouponImplementation = address(3);
+        couponImplementation = new MockCouponImplementation();
+        allowedCouponImplementation = address(couponImplementation);
         other = address(4);
         signer = vm.createWallet("signer");
 
@@ -119,6 +123,8 @@ contract UpdateAllowedCouponImplementationsTests is CouponsTests {
 }
 
 contract ApplyCouponTests is CouponsTests {
+    event CouponApplied(address indexed _caller, bytes32 indexed _tradeSignature, bytes32 indexed _couponSignature);
+
     error UnauthorizedCaller(address _caller);
     error CouponImplementationNotAllowed(address _couponImplementation);
     error Expired();
@@ -164,5 +170,24 @@ contract ApplyCouponTests is CouponsTests {
         vm.prank(marketplace);
         vm.expectRevert(InvalidSignature.selector);
         coupons.applyCoupon(trade, coupon);
+    }
+
+    function test_AppliesTheCouponToTheTrade() public {
+        Types.Trade memory trade;
+        trade.signer = signer.addr;
+        Types.Coupon memory coupon;
+        coupon.couponImplementation = allowedCouponImplementation;
+        coupon.checks.expiration = block.timestamp;
+        coupon.signature = signCoupon(coupon);
+
+        assertEq(coupons.signatureUses(keccak256(coupon.signature)), 0);
+
+        vm.prank(marketplace);
+        vm.expectEmit(address(coupons));
+        emit CouponApplied(marketplace, keccak256(trade.signature), keccak256(coupon.signature));
+        Types.Trade memory updatedTrade = coupons.applyCoupon(trade, coupon);
+        // Mock coupon implementation updates the signer of the trade to address(1337).
+        assertEq(updatedTrade.signer, address(1337));
+        assertEq(coupons.signatureUses(keccak256(coupon.signature)), 1);
     }
 }
