@@ -37,11 +37,8 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
 
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
-
             _verifyTradeSignature(trade, caller);
-
             bytes32 hashedSignature = keccak256(trade.signature);
-
             _cancelSignature(hashedSignature);
         }
     }
@@ -50,6 +47,7 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
         address caller = _msgSender();
 
         for (uint256 i = 0; i < _trades.length; i++) {
+            _verifyTrade(_trades[i], caller);
             _accept(_trades[i], caller);
         }
     }
@@ -62,11 +60,34 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
         }
 
         for (uint256 i = 0; i < _trades.length; i++) {
+            _verifyTrade(_trades[i], caller);
             _accept(coupons.applyCoupon(_trades[i], _coupons[i]), caller);
         }
     }
 
     function _accept(Trade memory _trade, address _caller) private {
+        bytes32 hashedSignature = keccak256(_trade.signature);
+        address signer = _trade.signer;
+
+        emit Traded(_caller, hashedSignature);
+
+        _transferAssets(_trade.sent, signer, _caller, signer);
+        _transferAssets(_trade.received, _caller, signer, signer);
+    }
+
+    function getTradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
+        bytes32 tradeId = keccak256(abi.encodePacked(_trade.checks.salt, _caller));
+
+        for (uint256 i = 0; i < _trade.received.length; i++) {
+            Asset memory asset = _trade.received[i];
+
+            tradeId = keccak256(abi.encodePacked(tradeId, asset.contractAddress, asset.value));
+        }
+
+        return tradeId;
+    }
+
+    function _verifyTrade(Trade memory _trade, address _caller) private {
         bytes32 hashedSignature = keccak256(_trade.signature);
         address signer = _trade.signer;
         bytes32 tradeId = getTradeId(_trade, _caller);
@@ -88,23 +109,6 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
         }
 
         signatureUses[hashedSignature]++;
-
-        emit Traded(_caller, hashedSignature);
-
-        _transferAssets(_trade.sent, signer, _caller, signer);
-        _transferAssets(_trade.received, _caller, signer, signer);
-    }
-
-    function getTradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
-        bytes32 tradeId = keccak256(abi.encodePacked(_trade.checks.salt, _caller));
-
-        for (uint256 i = 0; i < _trade.received.length; i++) {
-            Asset memory asset = _trade.received[i];
-
-            tradeId = keccak256(abi.encodePacked(tradeId, asset.contractAddress, asset.value));
-        }
-
-        return tradeId;
     }
 
     function _verifyTradeSignature(Trade memory _trade, address _signer) private view {
