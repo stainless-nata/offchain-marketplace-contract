@@ -117,31 +117,13 @@ contract CouponImplementation is ICouponImplementation, Types {
         MerkleCollectionDiscountCouponData memory data = abi.decode(_couponData.data, (MerkleCollectionDiscountCouponData));
         MerkleCollectionDiscountCouponCallerData memory callerData = abi.decode(_callerData, (MerkleCollectionDiscountCouponCallerData));
 
-        Asset[] memory sent = _trade.sent;
+        Asset memory sentAsset = _getFirstAsset(_trade.sent);
 
-        uint256 sentLength = sent.length;
-
-        if (sentLength != 1) {
-            revert TradesWithOneSentCollectionItemAllowed();
+        if (!MerkleProof.verify(callerData.proof, data.root, keccak256(abi.encode(sentAsset.contractAddress)))) {
+            revert InvalidProof(sentAsset.contractAddress);
         }
 
-        Asset memory sentAsset = sent[0];
-
-        address collectionAddress = sentAsset.contractAddress;
-
-        if (!MerkleProof.verify(callerData.proof, data.root, keccak256(abi.encode(collectionAddress)))) {
-            revert InvalidProof(collectionAddress);
-        }
-
-        Asset[] memory received = _trade.received;
-
-        for (uint256 i = 0; i < received.length; i++) {
-            Asset memory receivedAsset = received[i];
-
-            uint256 originalPrice = receivedAsset.value;
-
-            receivedAsset.value = originalPrice - originalPrice * data.rate / 1_000_000;
-        }
+        _trade.received = _applyDiscountToAssets(_trade.received, data.rate);
 
         return _trade;
     }
@@ -149,22 +131,12 @@ contract CouponImplementation is ICouponImplementation, Types {
     function _applySimpleCollectionDiscountCoupon(Trade memory _trade, CouponData memory _couponData) private pure returns (Trade memory) {
         SimpleCollectionDiscountCouponData memory data = abi.decode(_couponData.data, (SimpleCollectionDiscountCouponData));
 
-        Asset[] memory sent = _trade.sent;
-
-        uint256 sentLength = sent.length;
-
-        if (sentLength != 1) {
-            revert TradesWithOneSentCollectionItemAllowed();
-        }
-
-        Asset memory sentAsset = sent[0];
-
-        address collectionAddress = sentAsset.contractAddress;
+        Asset memory sentAsset = _getFirstAsset(_trade.sent);
 
         bool isApplied = false;
 
         for (uint256 i = 0; i < data.collections.length; i++) {
-            if (data.collections[i] == collectionAddress) {
+            if (data.collections[i] == sentAsset.contractAddress) {
                 isApplied = true;
                 break;
             }
@@ -174,16 +146,25 @@ contract CouponImplementation is ICouponImplementation, Types {
             revert CouponCannotBeApplied();
         }
 
-        Asset[] memory received = _trade.received;
-
-        for (uint256 i = 0; i < received.length; i++) {
-            Asset memory receivedAsset = received[i];
-
-            uint256 originalPrice = receivedAsset.value;
-
-            receivedAsset.value = originalPrice - originalPrice * data.rate / 1_000_000;
-        }
+        _trade.received = _applyDiscountToAssets(_trade.received, data.rate);
 
         return _trade;
+    }
+
+    function _getFirstAsset(Asset[] memory _assets) private pure returns (Asset memory) {
+        if (_assets.length != 1) {
+            revert TradesWithOneSentCollectionItemAllowed();
+        }
+
+        return _assets[0];
+    }
+
+    function _applyDiscountToAssets(Asset[] memory _assets, uint256 _rate) private pure returns (Asset[] memory) {
+        for (uint256 i = 0; i < _assets.length; i++) {
+            uint256 originalPrice = _assets[i].value;
+            _assets[i].value = originalPrice - originalPrice * _rate / 1_000_000;
+        }
+
+        return _assets;
     }
 }
