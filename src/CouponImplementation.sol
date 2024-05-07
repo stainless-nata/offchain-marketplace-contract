@@ -1,7 +1,11 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.20;
+
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 import {Types} from "./common/Types.sol";
 import {ICouponImplementation} from "./interfaces/ICouponImplementation.sol";
+import {ICollection} from "./interfaces/ICollection.sol";
 
 contract CouponImplementation is ICouponImplementation {
     uint256 public constant COUPON_TYPE_MERKLE_COLLECTION_DISCOUNT = 0;
@@ -30,8 +34,9 @@ contract CouponImplementation is ICouponImplementation {
     error TradesWithOneSentCollectionItemAllowed();
     error InvalidProof(address _collectionAddress);
     error CouponCannotBeApplied();
+    error SignerIsNotTheCreator(address _signer, address _creator);
 
-    function applyCoupon(Types.Trade memory _trade, Types.Coupon memory _coupon) external pure returns (Types.Trade memory) {
+    function applyCoupon(Types.Trade memory _trade, Types.Coupon memory _coupon) external view returns (Types.Trade memory) {
         CouponData memory couponData = abi.decode(_coupon.data, (CouponData));
 
         uint256 discountType = couponData.discountType;
@@ -47,16 +52,16 @@ contract CouponImplementation is ICouponImplementation {
 
     function _applyMerkleCollectionDiscountCoupon(Types.Trade memory _trade, CouponData memory _couponData, bytes memory _callerData)
         private
-        pure
+        view
         returns (Types.Trade memory)
     {
         MerkleCollectionDiscountCouponData memory data = abi.decode(_couponData.data, (MerkleCollectionDiscountCouponData));
         MerkleCollectionDiscountCouponCallerData memory callerData = abi.decode(_callerData, (MerkleCollectionDiscountCouponCallerData));
 
-        Types.Asset memory sentAsset = _getFirstAsset(_trade.sent);
+        address collection = _getCollectionAddress(_trade);
 
-        if (!MerkleProof.verify(callerData.proof, data.root, keccak256(abi.encode(sentAsset.contractAddress)))) {
-            revert InvalidProof(sentAsset.contractAddress);
+        if (!MerkleProof.verify(callerData.proof, data.root, keccak256(abi.encode(collection)))) {
+            revert InvalidProof(collection);
         }
 
         _trade.received = _applyDiscountToAssets(_trade.received, data.rate);
@@ -64,15 +69,19 @@ contract CouponImplementation is ICouponImplementation {
         return _trade;
     }
 
-    function _applySimpleCollectionDiscountCoupon(Types.Trade memory _trade, CouponData memory _couponData) private pure returns (Types.Trade memory) {
+    function _applySimpleCollectionDiscountCoupon(Types.Trade memory _trade, CouponData memory _couponData)
+        private
+        view
+        returns (Types.Trade memory)
+    {
         SimpleCollectionDiscountCouponData memory data = abi.decode(_couponData.data, (SimpleCollectionDiscountCouponData));
 
-        Types.Asset memory sentAsset = _getFirstAsset(_trade.sent);
+        address collection = _getCollectionAddress(_trade);
 
         bool isApplied = false;
 
         for (uint256 i = 0; i < data.collections.length; i++) {
-            if (data.collections[i] == sentAsset.contractAddress) {
+            if (data.collections[i] == collection) {
                 isApplied = true;
                 break;
             }
@@ -87,12 +96,22 @@ contract CouponImplementation is ICouponImplementation {
         return _trade;
     }
 
-    function _getFirstAsset(Types.Asset[] memory _assets) private pure returns (Types.Asset memory) {
-        if (_assets.length != 1) {
+    function _getCollectionAddress(Types.Trade memory _trade) private view returns(address) {
+        if (_trade.sent.length != 1) {
             revert TradesWithOneSentCollectionItemAllowed();
         }
 
-        return _assets[0];
+        Types.Asset memory sentAsset = _trade.sent[0];
+
+        ICollection collection = ICollection(sentAsset.contractAddress);
+
+        address creator = collection.creator();
+
+        if (creator != _trade.signer) {
+            revert SignerIsNotTheCreator(_trade.signer, creator);
+        }
+
+        return address(collection);
     }
 
     function _applyDiscountToAssets(Types.Asset[] memory _assets, uint256 _rate) private pure returns (Types.Asset[] memory) {
