@@ -5,28 +5,44 @@ import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
 import {Coupons} from "../src/Coupons.sol";
+import {Types} from "../src/common/Types.sol";
 
 contract CouponsHarness is Coupons {
     constructor(address _marketplace, address _owner, address[] memory _allowedCouponImplementations)
         Coupons(_marketplace, _owner, _allowedCouponImplementations)
     {}
+
+    function eip712CouponHash(Coupon memory _coupon) external view returns (bytes32) {
+        return _hashTypedDataV4(_hashCoupon(_coupon));
+    }
 }
 
 abstract contract CouponsTests is Test {
-    address marketplace = address(1);
-    address owner = address(2);
-    address allowedCouponImplementation = address(3);
-    address other = address(4);
-
+    address marketplace;
+    address owner;
+    address allowedCouponImplementation;
+    address other;
+    VmSafe.Wallet signer;
     CouponsHarness coupons;
 
     error OwnableUnauthorizedAccount(address account);
 
     function setUp() public {
+        marketplace = address(1);
+        owner = address(2);
+        allowedCouponImplementation = address(3);
+        other = address(4);
+        signer = vm.createWallet("signer");
+
         address[] memory allowedCouponImplementations = new address[](1);
         allowedCouponImplementations[0] = allowedCouponImplementation;
 
         coupons = new CouponsHarness(marketplace, owner, allowedCouponImplementations);
+    }
+
+    function signCoupon(Types.Coupon memory _coupon) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, coupons.eip712CouponHash(_coupon));
+        return abi.encodePacked(r, s, v);
     }
 }
 
@@ -99,5 +115,54 @@ contract UpdateAllowedCouponImplementationsTests is CouponsTests {
 
         assertEq(coupons.allowedCouponImplementations(allowedCouponImplementation), false);
         assertEq(coupons.allowedCouponImplementations(other), true);
+    }
+}
+
+contract ApplyCouponTests is CouponsTests {
+    error UnauthorizedCaller(address _caller);
+    error CouponImplementationNotAllowed(address _couponImplementation);
+    error Expired();
+    error InvalidSignature();
+
+    function test_RevertsIfCallerIsNotTheMarketplace() public {
+        Types.Trade memory trade;
+        Types.Coupon memory coupon;
+
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(UnauthorizedCaller.selector, other));
+        coupons.applyCoupon(trade, coupon);
+    }
+
+    function test_RevertsIfCouponImplementationIsNotAllowed() public {
+        Types.Trade memory trade;
+        Types.Coupon memory coupon;
+        coupon.couponImplementation = other;
+
+        vm.prank(marketplace);
+        vm.expectRevert(abi.encodeWithSelector(CouponImplementationNotAllowed.selector, other));
+        coupons.applyCoupon(trade, coupon);
+    }
+
+    function test_RevertsIfCheckFails() public {
+        Types.Trade memory trade;
+        Types.Coupon memory coupon;
+        coupon.couponImplementation = allowedCouponImplementation;
+
+        vm.prank(marketplace);
+        vm.expectRevert(Expired.selector);
+        coupons.applyCoupon(trade, coupon);
+    }
+
+    function test_RevertsIfSignatureIsInvalid() public {
+        Types.Trade memory trade;
+        trade.signer = other;
+        Types.Coupon memory coupon;
+        coupon.couponImplementation = allowedCouponImplementation;
+        coupon.checks.expiration = block.timestamp;
+        coupon.signature = signCoupon(coupon);
+
+        vm.prank(marketplace);
+        vm.expectRevert(InvalidSignature.selector);
+        coupons.applyCoupon(trade, coupon);
     }
 }

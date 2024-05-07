@@ -68,12 +68,17 @@ contract Coupons is ICoupons, Verifications {
         uint256 currentSignatureUses = signatureUses[hashedCouponSignature];
 
         _verifyChecks(_coupon.checks, currentSignatureUses, _trade.signer, caller);
+        _verifyCouponSignature(_coupon, _trade.signer);
 
         emit CouponApplied(caller, hashedTradeSignature, hashedCouponSignature);
 
         signatureUses[hashedCouponSignature]++;
 
         return ICouponImplementation(couponImplementation).applyCoupon(_trade, _coupon);
+    }
+
+    function _verifyCouponSignature(Coupon memory _coupon, address _signer) private view {
+        _verifySignature(_hashCoupon(_coupon), _coupon.signature, _signer);
     }
 
     function _updateMarketplace(address _marketplace) private {
