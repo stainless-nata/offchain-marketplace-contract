@@ -2,9 +2,11 @@
 pragma solidity ^0.8.20;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Verifications} from "./common/Verifications.sol";
 import {Types} from "./common/Types.sol";
+import {EIP712} from "./external/EIP712.sol";
 
 interface ICouponImplementation {
     function applyCoupon(Types.Trade calldata _trade, Types.Coupon calldata _coupon) external view returns (Types.Trade memory);
@@ -14,18 +16,28 @@ interface ICoupons {
     function applyCoupon(Types.Trade calldata _trade, Types.Coupon calldata _coupon) external returns (Types.Trade memory);
 }
 
-abstract contract Coupons is ICoupons, Verifications {
+contract Coupons is ICoupons, Verifications {
     address public marketplace;
     mapping(address => bool) public allowedCouponImplementations;
 
-    event AllowedCouponImplementationsChanged(address indexed _caller, address indexed _couponImplementation, bool _value);
+    event MarketplaceUpdated(address indexed _caller, address indexed _marketplace);
+    event AllowedCouponImplementationsUpdated(address indexed _caller, address indexed _couponImplementation, bool _value);
     event CouponApplied(address indexed _caller, bytes32 indexed _tradeSignature, bytes32 indexed _couponSignature);
 
     error LengthMissmatch();
+    error UnauthorizedCaller(address _caller);
     error CouponImplementationNotAllowed(address _couponImplementation);
 
-    constructor(address _marketplace) {
-        marketplace = _marketplace;
+    constructor(address _marketplace, address _owner, address[] memory _allowedCouponImplementations) EIP712("Coupons", "1.0.0") Ownable(_owner) {
+        _updateMarketplace(_marketplace);
+
+        for (uint256 i = 0; i < _allowedCouponImplementations.length; i++) {
+            _updateAllowedCouponImplementations(_allowedCouponImplementations[i], true);
+        }
+    }
+
+    function updateMarketplace(address _marketplace) external onlyOwner {
+        _updateMarketplace(_marketplace);
     }
 
     function updateAllowedCouponImplementations(address[] memory _couponImplementations, bool[] memory _values) external onlyOwner {
@@ -33,19 +45,18 @@ abstract contract Coupons is ICoupons, Verifications {
             revert LengthMissmatch();
         }
 
-        address caller = _msgSender();
-
         for (uint256 i = 0; i < _couponImplementations.length; i++) {
-            address couponImplementation = _couponImplementations[i];
-            bool value = _values[i];
-
-            allowedCouponImplementations[couponImplementation] = value;
-
-            emit AllowedCouponImplementationsChanged(caller, couponImplementation, value);
+            _updateAllowedCouponImplementations(_couponImplementations[i], _values[i]);
         }
     }
 
     function applyCoupon(Trade calldata _trade, Coupon calldata _coupon) external virtual returns (Trade memory) {
+        address caller = _msgSender();
+
+        if (caller != marketplace) {
+            revert UnauthorizedCaller(caller);
+        }
+
         address couponImplementation = _coupon.couponImplementation;
 
         if (!allowedCouponImplementations[couponImplementation]) {
@@ -55,7 +66,6 @@ abstract contract Coupons is ICoupons, Verifications {
         bytes32 hashedCouponSignature = keccak256(_coupon.signature);
         bytes32 hashedTradeSignature = keccak256(_trade.signature);
         uint256 currentSignatureUses = signatureUses[hashedCouponSignature];
-        address caller = _msgSender();
 
         _verifyChecks(_coupon.checks, currentSignatureUses, _trade.signer, caller);
 
@@ -64,6 +74,18 @@ abstract contract Coupons is ICoupons, Verifications {
         signatureUses[hashedCouponSignature]++;
 
         return ICouponImplementation(couponImplementation).applyCoupon(_trade, _coupon);
+    }
+
+    function _updateMarketplace(address _marketplace) private {
+        marketplace = _marketplace;
+
+        emit MarketplaceUpdated(_msgSender(), _marketplace);
+    }
+
+    function _updateAllowedCouponImplementations(address _couponImplementation, bool _value) private {
+        allowedCouponImplementations[_couponImplementation] = _value;
+
+        emit AllowedCouponImplementationsUpdated(_msgSender(), _couponImplementation, _value);
     }
 }
 
