@@ -60,7 +60,9 @@ contract CouponImplementation is ICouponImplementation {
 
         address collection = _getCollectionAddress(_trade);
 
-        if (!MerkleProof.verify(callerData.proof, data.root, keccak256(abi.encode(collection)))) {
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(collection))));
+
+        if (!MerkleProof.verify(callerData.proof, data.root, leaf)) {
             revert InvalidProof(collection);
         }
 
