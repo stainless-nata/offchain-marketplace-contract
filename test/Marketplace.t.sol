@@ -129,6 +129,23 @@ contract UnpauseTests is MarketplaceTests {
     }
 }
 
+contract UpdateCouponsTests is MarketplaceTests {
+    event CouponsUpdated(address indexed _caller, address indexed _coupons);
+
+    function test_RevertsIfNotOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateCoupons(other);
+    }
+
+    function test_CouponsUpdated() public {
+        vm.prank(owner);
+        vm.expectEmit(address(marketplace));
+        emit CouponsUpdated(owner, other);
+        marketplace.updateCoupons(other);
+    }
+}
+
 contract IncreaseContractSignatureIndexTests is MarketplaceTests {
     event ContractSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
 

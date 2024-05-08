@@ -7,14 +7,15 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 import {EIP712} from "./external/EIP712.sol";
 import {Verifications} from "./common/Verifications.sol";
-import {Coupons} from "./Coupons.sol";
+import {ICoupons} from "./interfaces/ICoupons.sol";
 import {AssetTransfers} from "./AssetTransfers.sol";
 import {NativeMetaTransaction} from "./external/NativeMetaTransaction.sol";
 
 contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pausable, ReentrancyGuard {
-    Coupons public coupons;
+    ICoupons public coupons;
     mapping(bytes32 => bool) public usedTradeIds;
 
+    event CouponsUpdated(address indexed _caller, address indexed _coupons);
     event Traded(address indexed _caller, bytes32 indexed _signature);
 
     error UsedTradeId();
@@ -24,7 +25,7 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
         Ownable(_owner)
         EIP712(_eip712Name, _eip712Version)
     {
-        coupons = Coupons(_coupons);
+        _updateCoupons(_coupons);
     }
 
     function pause() external onlyOwner {
@@ -33,6 +34,10 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    function updateCoupons(address _coupons) external onlyOwner {
+        _updateCoupons(_coupons);
     }
 
     function cancelSignature(Trade[] calldata _trades) external {
@@ -132,5 +137,11 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
 
     function _msgSender() internal view override returns (address) {
         return _getMsgSender();
+    }
+
+    function _updateCoupons(address _coupons) private {
+        coupons = ICoupons(_coupons);
+
+        emit CouponsUpdated(_msgSender(), _coupons);
     }
 }
