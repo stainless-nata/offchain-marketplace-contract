@@ -4,11 +4,9 @@ pragma solidity ^0.8.20;
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 import {ERC1271WalletMock} from "@openzeppelin/contracts/mocks/ERC1271WalletMock.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import {Marketplace} from "../src/Marketplace.sol";
 import {MockExternalChecks} from "../src/mocks/MockExternalChecks.sol";
-import {EIP712} from "../src/external/EIP712.sol";
 
 contract MarketplaceHarness is Marketplace {
     constructor(address _owner, address _coupons, string memory _eip712Name, string memory _eip712Version)

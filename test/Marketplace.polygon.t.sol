@@ -7,7 +7,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {Marketplace} from "../src/Marketplace.sol";
-import {IComposable} from "../src/interfaces/IComposable.sol";
 import {ICollection} from "../src/interfaces/ICollection.sol";
 
 contract MarketplaceHarness is Marketplace {
