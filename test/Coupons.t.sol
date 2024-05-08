@@ -29,6 +29,7 @@ abstract contract CouponsTests is Test {
     ICouponImplementation couponImplementation;
 
     error OwnableUnauthorizedAccount(address account);
+    error InvalidSignature();
 
     function setUp() public {
         marketplace = address(1);
@@ -128,7 +129,6 @@ contract ApplyCouponTests is CouponsTests {
     error UnauthorizedCaller(address _caller);
     error CouponImplementationNotAllowed(address _couponImplementation);
     error Expired();
-    error InvalidSignature();
 
     function test_RevertsIfCallerIsNotTheMarketplace() public {
         Types.Trade memory trade;
@@ -189,5 +189,89 @@ contract ApplyCouponTests is CouponsTests {
         // Mock coupon implementation updates the signer of the trade to address(1337).
         assertEq(updatedTrade.signer, address(1337));
         assertEq(coupons.signatureUses(keccak256(coupon.signature)), 1);
+    }
+}
+
+contract CancelSignatureTests is CouponsTests {
+    event SignatureCancelled(address indexed _caller, bytes32 indexed _signature);
+    
+    function test_CanSendEmptyListOfCoupons() public {
+        vm.prank(other);
+        coupons.cancelSignature(new Types.Coupon[](0));
+    }
+
+    function test_RevertsIfInvalidSigner() public {
+        Types.Coupon[] memory couponList = new Types.Coupon[](1);
+        couponList[0].signature = signCoupon(couponList[0]); 
+
+        vm.prank(other);
+        vm.expectRevert(InvalidSignature.selector);
+        coupons.cancelSignature(couponList);
+    }
+
+    function test_SignatureCancelled() public {
+        Types.Coupon[] memory couponList = new Types.Coupon[](1);
+        couponList[0].signature = signCoupon(couponList[0]); 
+
+        bytes32 hashedSignature = keccak256(couponList[0].signature);
+
+        assertEq(coupons.cancelledSignatures(hashedSignature), false);
+
+        vm.prank(signer.addr);
+        vm.expectEmit(address(coupons));
+        emit SignatureCancelled(signer.addr, hashedSignature);
+        coupons.cancelSignature(couponList);
+
+        assertEq(coupons.cancelledSignatures(hashedSignature), true);
+    }
+
+    function test_MultipleSignaturesCancelled() public {
+        Types.Coupon[] memory couponList = new Types.Coupon[](2);
+        couponList[0].checks.expiration = block.timestamp;
+        couponList[0].signature = signCoupon(couponList[0]); 
+        couponList[1].checks.expiration = block.timestamp + 1;
+        couponList[1].signature = signCoupon(couponList[1]);
+
+        bytes32 hashedSignature1 = keccak256(couponList[0].signature);
+        bytes32 hashedSignature2 = keccak256(couponList[1].signature);
+
+        assertNotEq(hashedSignature1, hashedSignature2);
+
+        assertEq(coupons.cancelledSignatures(hashedSignature1), false);
+        assertEq(coupons.cancelledSignatures(hashedSignature2), false);
+
+        vm.prank(signer.addr);
+        vm.expectEmit(address(coupons));
+        emit SignatureCancelled(signer.addr, hashedSignature1);
+        vm.expectEmit(address(coupons));
+        emit SignatureCancelled(signer.addr, hashedSignature2);
+        coupons.cancelSignature(couponList);
+
+        assertEq(coupons.cancelledSignatures(hashedSignature1), true);
+        assertEq(coupons.cancelledSignatures(hashedSignature2), true);
+    }
+
+    function test_CanCancelTheSameSignatureMultipleTimes() public {
+        Types.Coupon[] memory couponList = new Types.Coupon[](2);
+        couponList[0].signature = signCoupon(couponList[0]); 
+        couponList[1].signature = signCoupon(couponList[1]);
+
+        bytes32 hashedSignature1 = keccak256(couponList[0].signature);
+        bytes32 hashedSignature2 = keccak256(couponList[1].signature);
+
+        assertEq(hashedSignature1, hashedSignature2);
+
+        assertEq(coupons.cancelledSignatures(hashedSignature1), false);
+        assertEq(coupons.cancelledSignatures(hashedSignature2), false);
+
+        vm.prank(signer.addr);
+        vm.expectEmit(address(coupons));
+        emit SignatureCancelled(signer.addr, hashedSignature1);
+        vm.expectEmit(address(coupons));
+        emit SignatureCancelled(signer.addr, hashedSignature2);
+        coupons.cancelSignature(couponList);
+
+        assertEq(coupons.cancelledSignatures(hashedSignature1), true);
+        assertEq(coupons.cancelledSignatures(hashedSignature2), true);
     }
 }

@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Verifications} from "./common/Verifications.sol";
-import {Types} from "./common/Types.sol";
 import {EIP712} from "./external/EIP712.sol";
 import {ICouponImplementation} from "./interfaces/ICouponImplementation.sol";
 import {ICoupons} from "./interfaces/ICoupons.sol";
@@ -43,6 +42,20 @@ contract Coupons is ICoupons, Verifications {
         }
     }
 
+    function cancelSignature(Coupon[] calldata _coupons) external {
+        address caller = _msgSender();
+
+        for (uint256 i = 0; i < _coupons.length; i++) {
+            Coupon memory coupon = _coupons[i];
+
+            _verifyCouponSignature(coupon, caller);
+
+            bytes32 hashedSignature = keccak256(coupon.signature);
+
+            _cancelSignature(hashedSignature);
+        }
+    }
+
     function applyCoupon(Trade calldata _trade, Coupon calldata _coupon) external virtual returns (Trade memory) {
         address caller = _msgSender();
 
@@ -60,7 +73,7 @@ contract Coupons is ICoupons, Verifications {
         bytes32 hashedTradeSignature = keccak256(_trade.signature);
         uint256 currentSignatureUses = signatureUses[hashedCouponSignature];
 
-        _verifyChecks(_coupon.checks, currentSignatureUses, _trade.signer, caller);
+        _verifyChecks(_coupon.checks, hashedCouponSignature, currentSignatureUses, _trade.signer, caller);
         _verifyCouponSignature(_coupon, _trade.signer);
 
         emit CouponApplied(caller, hashedTradeSignature, hashedCouponSignature);
