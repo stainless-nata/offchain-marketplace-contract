@@ -7,12 +7,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {Marketplace} from "../src/Marketplace.sol";
-import {PolygonMarketplace} from "../src/PolygonMarketplace.sol";
 import {IComposable} from "../src/interfaces/IComposable.sol";
 import {ICollection} from "../src/interfaces/ICollection.sol";
 
-contract PolygonMarketplaceHarness is PolygonMarketplace {
-    constructor(address _owner) PolygonMarketplace(_owner) {}
+contract MarketplaceHarness is Marketplace {
+    constructor(address _owner, address _coupons, string memory _eip712Name, string memory _eip712Version)
+        Marketplace(_owner, _coupons, _eip712Name, _eip712Version)
+    {}
 
     function eip712Name() external view returns (string memory) {
         return _EIP712Name();
@@ -40,10 +41,10 @@ contract PolygonMarketplaceHarness is PolygonMarketplace {
     }
 }
 
-abstract contract PolygonMarketplaceTests is Test {
+abstract contract MarketplaceTests is Test {
     VmSafe.Wallet signer;
     address other;
-    PolygonMarketplaceHarness marketplace;
+    MarketplaceHarness marketplace;
 
     function setUp() public virtual {
         uint256 forkId = vm.createFork("https://rpc.decentraland.org/polygon", 56395304); // Apr-29-2024 07:23:50 PM +UTC
@@ -51,7 +52,7 @@ abstract contract PolygonMarketplaceTests is Test {
 
         signer = vm.createWallet("signer");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
-        marketplace = new PolygonMarketplaceHarness(0x0E659A116e161d8e502F9036bAbDA51334F2667E);
+        marketplace = new MarketplaceHarness(0x0E659A116e161d8e502F9036bAbDA51334F2667E, address(0), "Marketplace", "1.0.0");
     }
 
     function signTrade(Marketplace.Trade memory _trade) internal view returns (bytes memory) {
@@ -67,7 +68,7 @@ abstract contract PolygonMarketplaceTests is Test {
     }
 }
 
-contract UnsupportedAssetTypeTests is PolygonMarketplaceTests {
+contract UnsupportedAssetTypeTests is MarketplaceTests {
     error UnsupportedAssetType(uint256 _assetType);
 
     function test_RevertsIfAssetTypeIsInvalid() public {
@@ -84,7 +85,7 @@ contract UnsupportedAssetTypeTests is PolygonMarketplaceTests {
     }
 }
 
-contract TransferERC20Tests is PolygonMarketplaceTests {
+contract TransferERC20Tests is MarketplaceTests {
     IERC20 erc20;
     uint256 erc20Sent;
     address erc20OriginalHolder;
@@ -103,7 +104,7 @@ contract TransferERC20Tests is PolygonMarketplaceTests {
     function _getBaseTradesForSent() private view returns (Marketplace.Trade[] memory) {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].sent = new Marketplace.Asset[](1);
-        trades[0].sent[0].assetType = marketplace.ERC20_ID();
+        trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC20();
         trades[0].sent[0].contractAddress = address(erc20);
         trades[0].sent[0].value = erc20Sent;
         trades[0].signature = signTrade(trades[0]);
@@ -113,7 +114,7 @@ contract TransferERC20Tests is PolygonMarketplaceTests {
     function _getBaseTradesForReceived() private view returns (Marketplace.Trade[] memory) {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].received = new Marketplace.Asset[](1);
-        trades[0].received[0].assetType = marketplace.ERC20_ID();
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_ERC20();
         trades[0].received[0].contractAddress = address(erc20);
         trades[0].received[0].value = erc20Sent;
         trades[0].signature = signTrade(trades[0]);
@@ -201,7 +202,7 @@ contract TransferERC20Tests is PolygonMarketplaceTests {
     }
 }
 
-contract TransferERC721Tests is PolygonMarketplaceTests {
+contract TransferERC721Tests is MarketplaceTests {
     IERC721 erc721;
     uint256 erc721TokenId;
     address erc721OriginalHolder;
@@ -218,7 +219,7 @@ contract TransferERC721Tests is PolygonMarketplaceTests {
     function _getBaseTradesForSent() private view returns (Marketplace.Trade[] memory) {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].sent = new Marketplace.Asset[](1);
-        trades[0].sent[0].assetType = marketplace.ERC721_ID();
+        trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(erc721);
         trades[0].sent[0].value = erc721TokenId;
         trades[0].signature = signTrade(trades[0]);
@@ -228,7 +229,7 @@ contract TransferERC721Tests is PolygonMarketplaceTests {
     function _getBaseTradesForReceived() private view returns (Marketplace.Trade[] memory) {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].received = new Marketplace.Asset[](1);
-        trades[0].received[0].assetType = marketplace.ERC721_ID();
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].received[0].contractAddress = address(erc721);
         trades[0].received[0].value = erc721TokenId;
         trades[0].signature = signTrade(trades[0]);
@@ -314,7 +315,7 @@ contract TransferERC721Tests is PolygonMarketplaceTests {
     }
 }
 
-contract TransferCollectionItemTests is PolygonMarketplaceTests {
+contract TransferCollectionItemTests is MarketplaceTests {
     ICollection collection;
     uint256 collectionItemId;
     address collectionItemOriginalCreator;
@@ -333,7 +334,7 @@ contract TransferCollectionItemTests is PolygonMarketplaceTests {
     function _getBaseTradesForSent() private view returns (Marketplace.Trade[] memory) {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].sent = new Marketplace.Asset[](1);
-        trades[0].sent[0].assetType = marketplace.COLLECTION_ITEM_ID();
+        trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721_COLLECTION_ITEM();
         trades[0].sent[0].contractAddress = address(collection);
         trades[0].sent[0].value = collectionItemId;
         trades[0].signature = signTrade(trades[0]);
@@ -343,7 +344,7 @@ contract TransferCollectionItemTests is PolygonMarketplaceTests {
     function _getBaseTradesForReceived() private view returns (Marketplace.Trade[] memory) {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].received = new Marketplace.Asset[](1);
-        trades[0].received[0].assetType = marketplace.COLLECTION_ITEM_ID();
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_ERC721_COLLECTION_ITEM();
         trades[0].received[0].contractAddress = address(collection);
         trades[0].received[0].value = collectionItemId;
         trades[0].signature = signTrade(trades[0]);
@@ -433,7 +434,7 @@ contract TransferCollectionItemTests is PolygonMarketplaceTests {
     }
 }
 
-contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
+contract ExecuteMetaTransactionTests is MarketplaceTests {
     VmSafe.Wallet metaTxSigner;
 
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
@@ -446,7 +447,7 @@ contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
         metaTxSigner = vm.createWallet("metaTxSigner");
     }
 
-    function signMetaTx(PolygonMarketplace.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
+    function signMetaTx(MarketplaceHarness.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_metaTx));
 
         return abi.encodePacked(r, s, v);
@@ -456,7 +457,7 @@ contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        PolygonMarketplace.MetaTransaction memory metaTx;
+        MarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 1;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -472,7 +473,7 @@ contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        PolygonMarketplace.MetaTransaction memory metaTx;
+        MarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = other;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -488,7 +489,7 @@ contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        PolygonMarketplace.MetaTransaction memory metaTx;
+        MarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -506,7 +507,7 @@ contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
         trades[0].checks.expiration = block.timestamp - 1;
         trades[0].signature = signTrade(trades[0]);
 
-        PolygonMarketplace.MetaTransaction memory metaTx;
+        MarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -521,12 +522,12 @@ contract ExecuteMetaTransactionTests is PolygonMarketplaceTests {
     function test_RevertsIfERC721AssetHasContractAddressZeroWithWithoutReasonError() public {
         Marketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].sent = new Marketplace.Asset[](1);
-        trades[0].sent[0].assetType = marketplace.ERC721_ID();
+        trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(0);
         trades[0].sent[0].value = 1;
         trades[0].signature = signTrade(trades[0]);
 
-        PolygonMarketplace.MetaTransaction memory metaTx;
+        MarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);

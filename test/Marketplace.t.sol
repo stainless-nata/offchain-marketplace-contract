@@ -11,7 +11,9 @@ import {MockExternalChecks} from "../src/mocks/MockExternalChecks.sol";
 import {EIP712} from "../src/external/EIP712.sol";
 
 contract MarketplaceHarness is Marketplace {
-    constructor(address _owner) Marketplace(_owner) EIP712("Marketplace", "1.0.0") Ownable(_owner) {}
+    constructor(address _owner, address _coupons, string memory _eip712Name, string memory _eip712Version)
+        Marketplace(_owner, _coupons, _eip712Name, _eip712Version)
+    {}
 
     function eip712Name() external view returns (string memory) {
         return _EIP712Name();
@@ -24,8 +26,6 @@ contract MarketplaceHarness is Marketplace {
     function eip712TradeHash(Trade memory _trade) external view returns (bytes32) {
         return _hashTypedDataV4(_hashTrade(_trade));
     }
-
-    function _transferAsset(Asset memory _asset, address _from, address _signer) internal override {}
 }
 
 abstract contract MarketplaceTests is Test {
@@ -41,7 +41,7 @@ abstract contract MarketplaceTests is Test {
     function setUp() public virtual {
         owner = vm.addr(0x1);
         other = vm.addr(0x2);
-        marketplace = new MarketplaceHarness(owner);
+        marketplace = new MarketplaceHarness(owner, address(0), "Marketplace", "1.0.0");
         signer = vm.createWallet("signer");
     }
 

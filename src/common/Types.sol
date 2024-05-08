@@ -20,6 +20,12 @@ abstract contract Types {
     // keccak256("Coupon(Checks checks,address couponImplementation,bytes data)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
     bytes32 private constant COUPON_TYPE_HASH = 0x9da4cc9954c195e1c1401bd6fd134f8099228aaac02ebeaee879417d1d6bbf1a;
 
+    uint256 public constant ASSET_TYPE_ERC20 = 1;
+    uint256 public constant ASSET_TYPE_ERC20_WITH_FEE = 2;
+    uint256 public constant ASSET_TYPE_ERC721 = 3;
+    uint256 public constant ASSET_TYPE_ERC721_COMPOSABLE = 4;
+    uint256 public constant ASSET_TYPE_ERC721_COLLECTION_ITEM = 5;
+
     struct ExternalCheck {
         address contractAddress;
         bytes4 selector;

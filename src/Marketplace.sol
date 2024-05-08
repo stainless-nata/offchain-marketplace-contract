@@ -8,10 +8,10 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {EIP712} from "./external/EIP712.sol";
 import {Verifications} from "./common/Verifications.sol";
 import {Coupons} from "./Coupons.sol";
+import {AssetTransfers} from "./AssetTransfers.sol";
+import {NativeMetaTransaction} from "./external/NativeMetaTransaction.sol";
 
-/// @notice Marketplace contract that allows the execution of signed Trades.
-/// Users can sign a Trade indicating which assets are to be traded. Another user can the accept the Trade using the signature, executing the exchange if all checks are valid.
-abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
+contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pausable, ReentrancyGuard {
     Coupons public coupons;
     mapping(bytes32 => bool) public usedTradeIds;
 
@@ -20,7 +20,10 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
     error UsedTradeId();
     error TradesAndCouponsLengthMismatch();
 
-    constructor(address _coupons) {
+    constructor(address _owner, address _coupons, string memory _eip712Name, string memory _eip712Version)
+        Ownable(_owner)
+        EIP712(_eip712Name, _eip712Version)
+    {
         coupons = Coupons(_coupons);
     }
 
@@ -71,8 +74,8 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
 
         emit Traded(_caller, hashedSignature);
 
-        _transferAssets(_trade.sent, signer, _caller, signer);
-        _transferAssets(_trade.received, _caller, signer, signer);
+        _transferAssets(_trade.sent, signer, _caller, signer, _caller);
+        _transferAssets(_trade.received, _caller, signer, signer, _caller);
     }
 
     function getTradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
@@ -115,7 +118,7 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
         _verifySignature(_hashTrade(_trade), _trade.signature, _signer);
     }
 
-    function _transferAssets(Asset[] memory _assets, address _from, address _to, address _signer) private {
+    function _transferAssets(Asset[] memory _assets, address _from, address _to, address _signer, address _caller) private {
         for (uint256 i = 0; i < _assets.length; i++) {
             Asset memory asset = _assets[i];
 
@@ -123,9 +126,11 @@ abstract contract Marketplace is Verifications, Pausable, ReentrancyGuard {
                 asset.beneficiary = _to;
             }
 
-            _transferAsset(asset, _from, _signer);
+            _transferAsset(asset, _from, _signer, _caller);
         }
     }
 
-    function _transferAsset(Asset memory _asset, address _from, address _signer) internal virtual;
+    function _msgSender() internal view override returns (address) {
+        return _getMsgSender();
+    }
 }
