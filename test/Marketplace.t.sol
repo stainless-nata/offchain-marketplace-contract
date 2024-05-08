@@ -331,7 +331,6 @@ contract CancelSignatureTests is MarketplaceTests {
 contract AcceptTests is MarketplaceTests {
     event Traded(address indexed _caller, bytes32 indexed _signature);
 
-    error CancelledSignature();
     error SignatureReuse();
     error UsedTradeId();
     error NotEffective();
@@ -340,6 +339,7 @@ contract AcceptTests is MarketplaceTests {
     error Expired();
     error NotAllowed();
     error ExternalChecksFailed();
+    error UsingCancelledSignature();
 
     function test_CanSendAnEmptyArrayOfTrades() public {
         Marketplace.Trade[] memory trades;
@@ -357,7 +357,7 @@ contract AcceptTests is MarketplaceTests {
         marketplace.cancelSignature(trades);
 
         vm.prank(other);
-        vm.expectRevert(CancelledSignature.selector);
+        vm.expectRevert(UsingCancelledSignature.selector);
         marketplace.accept(trades);
     }
 

@@ -16,7 +16,6 @@ abstract contract Signatures is Ownable, EIP712 {
     event SignerSignatureIndexIncreased(address indexed _caller, uint256 indexed _newValue);
     event SignatureCancelled(address indexed _caller, bytes32 indexed _signature);
 
-    error CancelledSignature();
     error SignatureReuse();
     error InvalidSignature();
 

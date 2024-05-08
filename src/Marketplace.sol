@@ -101,15 +101,11 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
         bytes32 tradeId = getTradeId(_trade, _caller);
         uint256 currentSignatureUses = signatureUses[hashedSignature];
 
-        if (cancelledSignatures[hashedSignature]) {
-            revert CancelledSignature();
-        }
-
         if (usedTradeIds[tradeId]) {
             revert UsedTradeId();
         }
 
-        _verifyChecks(_trade.checks, currentSignatureUses, signer, _caller);
+        _verifyChecks(_trade.checks, hashedSignature, currentSignatureUses, signer, _caller);
         _verifyTradeSignature(_trade, signer);
 
         if (currentSignatureUses + 1 == _trade.checks.uses) {

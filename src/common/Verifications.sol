@@ -17,8 +17,13 @@ abstract contract Verifications is Signatures, Types {
     error Expired();
     error NotAllowed();
     error ExternalChecksFailed();
+    error UsingCancelledSignature();
 
-    function _verifyChecks(Checks memory _checks, uint256 _currentSignatureUses, address _signer, address _caller) internal view {
+    function _verifyChecks(Checks memory _checks, bytes32 _hashedSignature, uint256 _currentSignatureUses, address _signer, address _caller) internal view {
+        if (cancelledSignatures[_hashedSignature]) {
+            revert UsingCancelledSignature();
+        }
+
         if (_checks.uses > 0 && _currentSignatureUses >= _checks.uses) {
             revert SignatureReuse();
         }
