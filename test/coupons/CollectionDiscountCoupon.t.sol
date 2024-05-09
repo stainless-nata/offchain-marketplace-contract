@@ -4,9 +4,9 @@ pragma solidity ^0.8.20;
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
-import {CollectionDiscountCoupon} from "../src/coupons/CollectionDiscountCoupon.sol";
-import {Types} from "../src/common/Types.sol";
-import {MockCollection} from "../src/mocks/MockCollection.sol";
+import {CollectionDiscountCoupon} from "../../src/coupons/CollectionDiscountCoupon.sol";
+import {Types} from "../../src/common/Types.sol";
+import {MockCollection} from "../../src/mocks/MockCollection.sol";
 
 contract CollectionDiscountCouponHarness is CollectionDiscountCoupon {}
 
