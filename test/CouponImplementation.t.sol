@@ -230,6 +230,37 @@ contract ApplySimpleCollectionDiscountCouponTests is CouponImplementationTests {
         assertEq(updatedTrade.received[1].value, 1 ether);
         assertEq(updatedTrade.received[2].value, 1.5 ether);
     }
+
+    function test_AppliesTheDiscountToAllReceivedAssetValues_OnlyOneCollection() public {
+        CouponImplementationHarness.SimpleCollectionDiscountCouponData memory simpleCollectionDiscountCouponData;
+        simpleCollectionDiscountCouponData.collections = new address[](1);
+        simpleCollectionDiscountCouponData.collections[0] = address(mockCollection);
+        simpleCollectionDiscountCouponData.rate = 500_000;
+        
+        CouponImplementationHarness.CouponData memory couponData;
+        couponData.discountType = couponImplementation.COUPON_TYPE_SIMPLE_COLLECTION_DISCOUNT();
+        couponData.data = abi.encode(simpleCollectionDiscountCouponData);
+
+        Types.Coupon memory coupon;
+        coupon.data = abi.encode(couponData);
+
+        Types.Trade memory trade;
+        trade.signer = signer;
+        trade.sent = new Types.Asset[](1);
+        trade.sent[0].contractAddress = address(mockCollection);
+        trade.received = new Types.Asset[](3);
+        trade.received[0].value = 1 ether;
+        trade.received[1].value = 2 ether;
+        trade.received[2].value = 3 ether;
+
+        mockCollection.transferCreatorship(signer);
+
+        Types.Trade memory updatedTrade = couponImplementation.applyCoupon(trade, coupon);
+
+        assertEq(updatedTrade.received[0].value, 0.5 ether);
+        assertEq(updatedTrade.received[1].value, 1 ether);
+        assertEq(updatedTrade.received[2].value, 1.5 ether);
+    }
 }
 
 contract ApplyMerkleCollectionDiscountCouponTests is CouponImplementationTests {
@@ -375,6 +406,31 @@ contract ApplyMerkleCollectionDiscountCouponTests is CouponImplementationTests {
         couponImplementation.applyCoupon(trade, coupon);
     }
 
+    function test_RevertsIfProofIsInvalid_MerkleTreeWithOneValue() public {
+        CouponImplementationHarness.MerkleCollectionDiscountCouponData memory merkleCollectionDiscountCouponData;
+        merkleCollectionDiscountCouponData.root = 0x7e321b7ae61d2fe49a2b9c8ba4d76b1b7f74d5eb773b09d8e23120a69998b51c;
+
+        CouponImplementationHarness.MerkleCollectionDiscountCouponCallerData memory merkleCollectionDiscountCouponCallerData;
+        
+        CouponImplementationHarness.CouponData memory couponData;
+        couponData.discountType = couponImplementation.COUPON_TYPE_MERKLE_COLLECTION_DISCOUNT();
+        couponData.data = abi.encode(merkleCollectionDiscountCouponData);
+
+        Types.Coupon memory coupon;
+        coupon.data = abi.encode(couponData);
+        coupon.callerData = abi.encode(merkleCollectionDiscountCouponCallerData);
+
+        Types.Trade memory trade;
+        trade.signer = signer;
+        trade.sent = new Types.Asset[](1);
+        trade.sent[0].contractAddress = address(mockCollection);
+
+        mockCollection.transferCreatorship(signer);
+
+        vm.expectRevert(abi.encodeWithSelector(InvalidProof.selector, address(mockCollection)));
+        couponImplementation.applyCoupon(trade, coupon);
+    }
+
     function test_AppliesTheDiscountToAllReceivedAssetValues() public {
         CouponImplementationHarness.MerkleCollectionDiscountCouponData memory merkleCollectionDiscountCouponData;
         merkleCollectionDiscountCouponData.root = 0x56980103ca6f02663aeaa6b3895be0e41e507731e5a2655d3da8c9c8618ccc92;
@@ -385,6 +441,39 @@ contract ApplyMerkleCollectionDiscountCouponTests is CouponImplementationTests {
         merkleCollectionDiscountCouponCallerData.proof[0] = 0xa7c46294ffa3fad92dc8422b2e38b688ccf1b86172f5beaf864af9368d2844e5;
         merkleCollectionDiscountCouponCallerData.proof[1] = 0xb8e277bcec6ddfe5a414b2200b3abcb1d3ee435c66531e8f21898f36a7ed122f;
         merkleCollectionDiscountCouponCallerData.proof[2] = 0x7747f5b3dcece1341b1470c482b95e4b5565365e4169abeb52162734e62147cf;
+        
+        CouponImplementationHarness.CouponData memory couponData;
+        couponData.discountType = couponImplementation.COUPON_TYPE_MERKLE_COLLECTION_DISCOUNT();
+        couponData.data = abi.encode(merkleCollectionDiscountCouponData);
+
+        Types.Coupon memory coupon;
+        coupon.data = abi.encode(couponData);
+        coupon.callerData = abi.encode(merkleCollectionDiscountCouponCallerData);
+
+        Types.Trade memory trade;
+        trade.signer = signer;
+        trade.sent = new Types.Asset[](1);
+        trade.sent[0].contractAddress = address(mockCollection);
+        trade.received = new Types.Asset[](3);
+        trade.received[0].value = 1 ether;
+        trade.received[1].value = 2 ether;
+        trade.received[2].value = 3 ether;
+
+        mockCollection.transferCreatorship(signer);
+
+        Types.Trade memory updatedTrade = couponImplementation.applyCoupon(trade, coupon);
+
+        assertEq(updatedTrade.received[0].value, 0.5 ether);
+        assertEq(updatedTrade.received[1].value, 1 ether);
+        assertEq(updatedTrade.received[2].value, 1.5 ether);
+    }
+
+    function test_AppliesTheDiscountToAllReceivedAssetValues_MerkleTreeWithOneValue() public {
+        CouponImplementationHarness.MerkleCollectionDiscountCouponData memory merkleCollectionDiscountCouponData;
+        merkleCollectionDiscountCouponData.root = 0x7e321b7ae61d2fe49a2b9c8ba4d76b1b7f74d5eb773b09d8e23120a69998b51c;
+        merkleCollectionDiscountCouponData.rate = 500_000;
+
+        CouponImplementationHarness.MerkleCollectionDiscountCouponCallerData memory merkleCollectionDiscountCouponCallerData;
         
         CouponImplementationHarness.CouponData memory couponData;
         couponData.discountType = couponImplementation.COUPON_TYPE_MERKLE_COLLECTION_DISCOUNT();
