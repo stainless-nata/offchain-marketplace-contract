@@ -1,20 +1,63 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Types} from "./common/Types.sol";
-import {IComposable} from "./interfaces/IComposable.sol";
-import {ICollection} from "./interfaces/ICollection.sol";
+import {Marketplace} from "src/marketplace/Marketplace.sol";
+import {ICouponManager} from "src/coupons/ICouponManager.sol";
+import {EIP712} from "src/common/EIP712.sol";
+import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
+import {IComposable} from "src/IComposable.sol";
+import {ICollection} from "src/ICollection.sol";
+import {CouponTypes} from "src/coupons/CouponTypes.sol";
 
-abstract contract AssetTransfers is Types {
+contract DecentralandMarketplace is Marketplace, NativeMetaTransaction, CouponTypes {
+    uint256 public constant ASSET_TYPE_ERC20 = 1;
+    uint256 public constant ASSET_TYPE_ERC20_WITH_FEE = 2;
+    uint256 public constant ASSET_TYPE_ERC721 = 3;
+    uint256 public constant ASSET_TYPE_ERC721_COMPOSABLE = 4;
+    uint256 public constant ASSET_TYPE_ERC721_COLLECTION_ITEM = 5;
+
+    ICouponManager public couponManager;
+
+    event CouponManagerUpdated(address indexed _caller, address indexed _couponManager);
+
+    error TradesAndCouponsLengthMismatch();
     error InvalidFingerprint();
     error NotCreator();
     error UnsupportedAssetType(uint256 _assetType);
 
-    function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal {
+    constructor(address _owner, address _couponManager) Ownable(_owner) EIP712("DecentralandMarketplace", "1.0.0") {
+        _updateCouponManager(_couponManager);
+    }
+
+    function updateCouponManager(address _couponManager) external onlyOwner {
+        _updateCouponManager(_couponManager);
+    }
+
+    function acceptWithCoupon(Trade[] calldata _trades, Coupon[] calldata _coupons) external whenNotPaused nonReentrant {
+        address caller = _msgSender();
+
+        if (_trades.length != _coupons.length) {
+            revert TradesAndCouponsLengthMismatch();
+        }
+
+        for (uint256 i = 0; i < _trades.length; i++) {
+            _verifyTrade(_trades[i], caller);
+            _accept(couponManager.applyCoupon(_trades[i], _coupons[i]), caller);
+        }
+    }
+
+    function _updateCouponManager(address _couponManager) private {
+        couponManager = ICouponManager(_couponManager);
+
+        emit CouponManagerUpdated(_msgSender(), _couponManager);
+    }
+
+    function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal override {
         uint256 assetType = _asset.assetType;
 
         if (assetType == ASSET_TYPE_ERC20) {
@@ -79,5 +122,9 @@ abstract contract AssetTransfers is Types {
         itemIds[0] = _asset.value;
 
         collection.issueTokens(beneficiaries, itemIds);
+    }
+
+    function _msgSender() internal view override returns (address) {
+        return _getMsgSender();
     }
 }

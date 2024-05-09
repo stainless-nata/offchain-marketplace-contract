@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
-import {EIP712} from "../external/EIP712.sol";
+import {EIP712} from "src/common/EIP712.sol";
 
 abstract contract Signatures is Ownable, EIP712 {
     uint256 public contractSignatureIndex;

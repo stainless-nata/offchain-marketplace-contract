@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Signatures} from "./Signatures.sol";
-import {Types} from "./Types.sol";
+import {Signatures} from "src/common/Signatures.sol";
+import {CommonTypes} from "src/common/CommonTypes.sol";
 
-abstract contract Verifications is Signatures, Types {
+abstract contract Verifications is Signatures, CommonTypes {
     /// bytes4(keccak256("balanceOf(address)"))
     bytes4 private constant BALANCE_OF_SELECTOR = 0x70a08231;
 

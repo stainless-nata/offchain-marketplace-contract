@@ -3,12 +3,14 @@ pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {Verifications} from "./common/Verifications.sol";
-import {EIP712} from "./external/EIP712.sol";
-import {ICoupon} from "./interfaces/ICoupon.sol";
-import {NativeMetaTransaction} from "./external/NativeMetaTransaction.sol";
+import {Verifications} from "src/common/Verifications.sol";
+import {EIP712} from "src/common/EIP712.sol";
+import {ICoupon} from "src/coupons/ICoupon.sol";
+import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
+import {CouponTypesHashing} from "src/coupons/CouponTypesHashing.sol";
+import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 
-contract CouponManager is NativeMetaTransaction, Verifications {
+contract CouponManager is NativeMetaTransaction, Verifications, CouponTypesHashing, MarketplaceTypes {
     address public marketplace;
     mapping(address => bool) public allowedCoupons;
 

@@ -1,32 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {EIP712} from "./external/EIP712.sol";
-import {Verifications} from "./common/Verifications.sol";
-import {ICouponManager} from "./interfaces/ICouponManager.sol";
-import {AssetTransfers} from "./AssetTransfers.sol";
-import {NativeMetaTransaction} from "./external/NativeMetaTransaction.sol";
+import {Verifications} from "src/common/Verifications.sol";
+import {MarketplaceTypesHashing} from "src/marketplace/MarketplaceTypesHashing.sol";
 
-contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pausable, ReentrancyGuard {
-    ICouponManager public couponManager;
+abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausable, ReentrancyGuard {
     mapping(bytes32 => bool) public usedTradeIds;
 
-    event CouponManagerUpdated(address indexed _caller, address indexed _couponManager);
     event Traded(address indexed _caller, bytes32 indexed _signature);
 
     error UsedTradeId();
-    error TradesAndCouponsLengthMismatch();
-
-    constructor(address _owner, address _couponManager, string memory _eip712Name, string memory _eip712Version)
-        Ownable(_owner)
-        EIP712(_eip712Name, _eip712Version)
-    {
-        _updateCouponManager(_couponManager);
-    }
 
     function pause() external onlyOwner {
         _pause();
@@ -34,10 +20,6 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
 
     function unpause() external onlyOwner {
         _unpause();
-    }
-
-    function updateCouponManager(address _couponManager) external onlyOwner {
-        _updateCouponManager(_couponManager);
     }
 
     function cancelSignature(Trade[] calldata _trades) external {
@@ -60,20 +42,7 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
         }
     }
 
-    function acceptWithCoupon(Trade[] calldata _trades, Coupon[] calldata _coupons) external whenNotPaused nonReentrant {
-        address caller = _msgSender();
-
-        if (_trades.length != _coupons.length) {
-            revert TradesAndCouponsLengthMismatch();
-        }
-
-        for (uint256 i = 0; i < _trades.length; i++) {
-            _verifyTrade(_trades[i], caller);
-            _accept(couponManager.applyCoupon(_trades[i], _coupons[i]), caller);
-        }
-    }
-
-    function _accept(Trade memory _trade, address _caller) private {
+    function _accept(Trade memory _trade, address _caller) internal {
         bytes32 hashedSignature = keccak256(_trade.signature);
         address signer = _trade.signer;
 
@@ -95,7 +64,7 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
         return tradeId;
     }
 
-    function _verifyTrade(Trade memory _trade, address _caller) private {
+    function _verifyTrade(Trade memory _trade, address _caller) internal {
         bytes32 hashedSignature = keccak256(_trade.signature);
         address signer = _trade.signer;
         bytes32 tradeId = getTradeId(_trade, _caller);
@@ -131,13 +100,7 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
         }
     }
 
-    function _updateCouponManager(address _couponManager) private {
-        couponManager = ICouponManager(_couponManager);
-
-        emit CouponManagerUpdated(_msgSender(), _couponManager);
-    }
-
-    function _msgSender() internal view override returns (address) {
-        return _getMsgSender();
+    function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal virtual {
+        // Override
     }
 }

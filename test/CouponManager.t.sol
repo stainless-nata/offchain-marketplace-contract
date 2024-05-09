@@ -4,10 +4,11 @@ pragma solidity ^0.8.20;
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
-import {CouponManager} from "../src/CouponManager.sol";
-import {Types} from "../src/common/Types.sol";
-import {ICoupon} from "../src/interfaces/ICoupon.sol";
-import {MockCoupon} from "../src/mocks/MockCoupon.sol";
+import {CouponManager} from "src/coupons/CouponManager.sol";
+import {CouponTypes} from "src/coupons/CouponTypes.sol";
+import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
+import {ICoupon} from "src/coupons/ICoupon.sol";
+import {MockCoupon} from "src/mocks/MockCoupon.sol";
 
 contract CouponManagerHarness is CouponManager {
     constructor(address _marketplace, address _owner, address[] memory _allowedCoupons) CouponManager(_marketplace, _owner, _allowedCoupons) {}
@@ -58,7 +59,7 @@ abstract contract CouponsTests is Test {
         couponManager = new CouponManagerHarness(marketplace, owner, allowedCoupons);
     }
 
-    function signCoupon(Types.Coupon memory _coupon) internal view returns (bytes memory) {
+    function signCoupon(CouponTypes.Coupon memory _coupon) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, couponManager.eip712CouponHash(_coupon));
         return abi.encodePacked(r, s, v);
     }
@@ -178,8 +179,8 @@ contract ApplyCouponTests is CouponsTests {
     error Expired();
 
     function test_RevertsIfCallerIsNotTheMarketplace() public {
-        Types.Trade memory trade;
-        Types.Coupon memory coupon;
+        MarketplaceTypes.Trade memory trade;
+        CouponTypes.Coupon memory coupon;
 
         vm.prank(other);
         vm.expectRevert(abi.encodeWithSelector(UnauthorizedCaller.selector, other));
@@ -187,8 +188,8 @@ contract ApplyCouponTests is CouponsTests {
     }
 
     function test_RevertsIfCouponImplementationIsNotAllowed() public {
-        Types.Trade memory trade;
-        Types.Coupon memory coupon;
+        MarketplaceTypes.Trade memory trade;
+        CouponTypes.Coupon memory coupon;
         coupon.couponAddress = other;
 
         vm.prank(marketplace);
@@ -197,8 +198,8 @@ contract ApplyCouponTests is CouponsTests {
     }
 
     function test_RevertsIfCheckFails() public {
-        Types.Trade memory trade;
-        Types.Coupon memory coupon;
+        MarketplaceTypes.Trade memory trade;
+        CouponTypes.Coupon memory coupon;
         coupon.couponAddress = allowedCoupon;
 
         vm.prank(marketplace);
@@ -207,9 +208,9 @@ contract ApplyCouponTests is CouponsTests {
     }
 
     function test_RevertsIfSignatureIsInvalid() public {
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
         trade.signer = other;
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.couponAddress = allowedCoupon;
         coupon.checks.expiration = block.timestamp;
         coupon.signature = signCoupon(coupon);
@@ -220,9 +221,9 @@ contract ApplyCouponTests is CouponsTests {
     }
 
     function test_AppliesTheCouponToTheTrade() public {
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
         trade.signer = signer.addr;
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.couponAddress = allowedCoupon;
         coupon.checks.expiration = block.timestamp;
         coupon.signature = signCoupon(coupon);
@@ -232,7 +233,7 @@ contract ApplyCouponTests is CouponsTests {
         vm.prank(marketplace);
         vm.expectEmit(address(couponManager));
         emit CouponApplied(marketplace, keccak256(trade.signature), keccak256(coupon.signature));
-        Types.Trade memory updatedTrade = couponManager.applyCoupon(trade, coupon);
+        MarketplaceTypes.Trade memory updatedTrade = couponManager.applyCoupon(trade, coupon);
         // Mock coupon implementation updates the signer of the trade to address(1337).
         assertEq(updatedTrade.signer, address(1337));
         assertEq(couponManager.signatureUses(keccak256(coupon.signature)), 1);
@@ -244,11 +245,11 @@ contract CancelSignatureTests is CouponsTests {
 
     function test_CanSendEmptyListOfCoupons() public {
         vm.prank(other);
-        couponManager.cancelSignature(new Types.Coupon[](0));
+        couponManager.cancelSignature(new CouponTypes.Coupon[](0));
     }
 
     function test_RevertsIfInvalidSigner() public {
-        Types.Coupon[] memory couponList = new Types.Coupon[](1);
+        CouponTypes.Coupon[] memory couponList = new CouponTypes.Coupon[](1);
         couponList[0].signature = signCoupon(couponList[0]);
 
         vm.prank(other);
@@ -257,7 +258,7 @@ contract CancelSignatureTests is CouponsTests {
     }
 
     function test_SignatureCancelled() public {
-        Types.Coupon[] memory couponList = new Types.Coupon[](1);
+        CouponTypes.Coupon[] memory couponList = new CouponTypes.Coupon[](1);
         couponList[0].signature = signCoupon(couponList[0]);
 
         bytes32 hashedSignature = keccak256(couponList[0].signature);
@@ -273,7 +274,7 @@ contract CancelSignatureTests is CouponsTests {
     }
 
     function test_MultipleSignaturesCancelled() public {
-        Types.Coupon[] memory couponList = new Types.Coupon[](2);
+        CouponTypes.Coupon[] memory couponList = new CouponTypes.Coupon[](2);
         couponList[0].checks.expiration = block.timestamp;
         couponList[0].signature = signCoupon(couponList[0]);
         couponList[1].checks.expiration = block.timestamp + 1;
@@ -299,7 +300,7 @@ contract CancelSignatureTests is CouponsTests {
     }
 
     function test_CanCancelTheSameSignatureMultipleTimes() public {
-        Types.Coupon[] memory couponList = new Types.Coupon[](2);
+        CouponTypes.Coupon[] memory couponList = new CouponTypes.Coupon[](2);
         couponList[0].signature = signCoupon(couponList[0]);
         couponList[1].signature = signCoupon(couponList[1]);
 

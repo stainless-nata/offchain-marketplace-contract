@@ -4,9 +4,10 @@ pragma solidity ^0.8.20;
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
-import {CollectionDiscountCoupon} from "../../src/coupons/CollectionDiscountCoupon.sol";
-import {Types} from "../../src/common/Types.sol";
-import {MockCollection} from "../../src/mocks/MockCollection.sol";
+import {CollectionDiscountCoupon} from "src/CollectionDiscountCoupon.sol";
+import {CouponTypes} from "src/coupons/CouponTypes.sol";
+import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
+import {MockCollection} from "src/mocks/MockCollection.sol";
 
 contract CollectionDiscountCouponHarness is CollectionDiscountCoupon {}
 
@@ -30,11 +31,11 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
     function test_RevertsIfCollectionDiscountCouponDataIsInvalid() public {
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = bytes("");
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
 
         vm.expectRevert();
         collectionDiscountCoupon.applyCoupon(trade, coupon);
@@ -43,11 +44,11 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
     function test_RevertsIfCollectionDiscountCouponCallerDataIsInvalid() public {
         CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = abi.encode(collectionDiscountCouponData);
         coupon.callerData = bytes("");
 
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
 
         vm.expectRevert();
         collectionDiscountCoupon.applyCoupon(trade, coupon);
@@ -57,11 +58,11 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = abi.encode(collectionDiscountCouponData);
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
 
         vm.expectRevert(TradesWithOneSentCollectionItemAllowed.selector);
         collectionDiscountCoupon.applyCoupon(trade, coupon);
@@ -71,12 +72,12 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = abi.encode(collectionDiscountCouponData);
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
-        Types.Trade memory trade;
-        trade.sent = new Types.Asset[](2);
+        MarketplaceTypes.Trade memory trade;
+        trade.sent = new MarketplaceTypes.Asset[](2);
 
         vm.expectRevert(TradesWithOneSentCollectionItemAllowed.selector);
         collectionDiscountCoupon.applyCoupon(trade, coupon);
@@ -86,12 +87,12 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = abi.encode(collectionDiscountCouponData);
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
-        Types.Trade memory trade;
-        trade.sent = new Types.Asset[](1);
+        MarketplaceTypes.Trade memory trade;
+        trade.sent = new MarketplaceTypes.Asset[](1);
 
         vm.expectRevert();
         collectionDiscountCoupon.applyCoupon(trade, coupon);
@@ -101,13 +102,13 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = abi.encode(collectionDiscountCouponData);
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
         trade.signer = signer;
-        trade.sent = new Types.Asset[](1);
+        trade.sent = new MarketplaceTypes.Asset[](1);
         trade.sent[0].contractAddress = address(mockCollection);
 
         vm.expectRevert(abi.encodeWithSelector(SignerIsNotTheCreator.selector, signer, address(0)));
@@ -124,13 +125,13 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         collectionDiscountCouponCallerData.proof[1] = 0x91f8b8d2c336dbdb2484b34885b0070baf79ebd29c182c675de7a0f92adc273a;
         collectionDiscountCouponCallerData.proof[2] = 0x7747f5b3dcece1341b1470c482b95e4b5565365e4169abeb52162734e62147cf;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = abi.encode(collectionDiscountCouponData);
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
         trade.signer = signer;
-        trade.sent = new Types.Asset[](1);
+        trade.sent = new MarketplaceTypes.Asset[](1);
         trade.sent[0].contractAddress = address(mockCollection);
 
         mockCollection.transferCreatorship(signer);
@@ -145,13 +146,13 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
 
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = abi.encode(collectionDiscountCouponData);
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
         trade.signer = signer;
-        trade.sent = new Types.Asset[](1);
+        trade.sent = new MarketplaceTypes.Asset[](1);
         trade.sent[0].contractAddress = address(mockCollection);
 
         mockCollection.transferCreatorship(signer);
@@ -171,22 +172,22 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         collectionDiscountCouponCallerData.proof[1] = 0xb8e277bcec6ddfe5a414b2200b3abcb1d3ee435c66531e8f21898f36a7ed122f;
         collectionDiscountCouponCallerData.proof[2] = 0x7747f5b3dcece1341b1470c482b95e4b5565365e4169abeb52162734e62147cf;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = abi.encode(collectionDiscountCouponData);
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
         trade.signer = signer;
-        trade.sent = new Types.Asset[](1);
+        trade.sent = new MarketplaceTypes.Asset[](1);
         trade.sent[0].contractAddress = address(mockCollection);
-        trade.received = new Types.Asset[](3);
+        trade.received = new MarketplaceTypes.Asset[](3);
         trade.received[0].value = 1 ether;
         trade.received[1].value = 2 ether;
         trade.received[2].value = 3 ether;
 
         mockCollection.transferCreatorship(signer);
 
-        Types.Trade memory updatedTrade = collectionDiscountCoupon.applyCoupon(trade, coupon);
+        MarketplaceTypes.Trade memory updatedTrade = collectionDiscountCoupon.applyCoupon(trade, coupon);
 
         assertEq(updatedTrade.received[0].value, 0.5 ether);
         assertEq(updatedTrade.received[1].value, 1 ether);
@@ -200,22 +201,22 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
 
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
 
-        Types.Coupon memory coupon;
+        CouponTypes.Coupon memory coupon;
         coupon.data = abi.encode(collectionDiscountCouponData);
         coupon.callerData = abi.encode(collectionDiscountCouponCallerData);
 
-        Types.Trade memory trade;
+        MarketplaceTypes.Trade memory trade;
         trade.signer = signer;
-        trade.sent = new Types.Asset[](1);
+        trade.sent = new MarketplaceTypes.Asset[](1);
         trade.sent[0].contractAddress = address(mockCollection);
-        trade.received = new Types.Asset[](3);
+        trade.received = new MarketplaceTypes.Asset[](3);
         trade.received[0].value = 1 ether;
         trade.received[1].value = 2 ether;
         trade.received[2].value = 3 ether;
 
         mockCollection.transferCreatorship(signer);
 
-        Types.Trade memory updatedTrade = collectionDiscountCoupon.applyCoupon(trade, coupon);
+        MarketplaceTypes.Trade memory updatedTrade = collectionDiscountCoupon.applyCoupon(trade, coupon);
 
         assertEq(updatedTrade.received[0].value, 0.5 ether);
         assertEq(updatedTrade.received[1].value, 1 ether);

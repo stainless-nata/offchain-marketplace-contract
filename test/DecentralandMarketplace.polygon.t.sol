@@ -6,13 +6,11 @@ import {VmSafe} from "forge-std/Vm.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-import {Marketplace} from "../src/Marketplace.sol";
-import {ICollection} from "../src/interfaces/ICollection.sol";
+import {DecentralandMarketplace} from "src/DecentralandMarketplace.sol";
+import {ICollection} from "src/ICollection.sol";
 
-contract MarketplaceHarness is Marketplace {
-    constructor(address _owner, address _couponManager, string memory _eip712Name, string memory _eip712Version)
-        Marketplace(_owner, _couponManager, _eip712Name, _eip712Version)
-    {}
+contract DecentralandMarketplaceHarness is DecentralandMarketplace {
+    constructor(address _owner, address _couponManager) DecentralandMarketplace(_owner, _couponManager) {}
 
     function eip712Name() external view returns (string memory) {
         return _EIP712Name();
@@ -40,50 +38,51 @@ contract MarketplaceHarness is Marketplace {
     }
 }
 
-abstract contract MarketplaceTests is Test {
+abstract contract DecentralandMarketplaceTests is Test {
+    address owner;
     VmSafe.Wallet signer;
     VmSafe.Wallet metaTxSigner;
     address other;
-    MarketplaceHarness marketplace;
+    DecentralandMarketplaceHarness marketplace;
 
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
 
     function setUp() public virtual {
         uint256 forkId = vm.createFork("https://rpc.decentraland.org/polygon", 56395304); // Apr-29-2024 07:23:50 PM +UTC
         vm.selectFork(forkId);
-
+        owner = 0x0E659A116e161d8e502F9036bAbDA51334F2667E;
         signer = vm.createWallet("signer");
         metaTxSigner = vm.createWallet("metaTxSigner");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
-        marketplace = new MarketplaceHarness(0x0E659A116e161d8e502F9036bAbDA51334F2667E, address(0), "Marketplace", "1.0.0");
+        marketplace = new DecentralandMarketplaceHarness(owner, address(0));
     }
 
-    function signTrade(Marketplace.Trade memory _trade) internal view returns (bytes memory) {
+    function signTrade(DecentralandMarketplace.Trade memory _trade) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, marketplace.eip712TradeHash(_trade));
         return abi.encodePacked(r, s, v);
     }
 
-    function signMetaTx(Marketplace.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
+    function signMetaTx(DecentralandMarketplace.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_metaTx));
         return abi.encodePacked(r, s, v);
     }
 
-    function _getBaseTrades() internal view virtual returns (Marketplace.Trade[] memory) {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+    function _getBaseTrades() internal view virtual returns (DecentralandMarketplace.Trade[] memory) {
+        DecentralandMarketplace.Trade[] memory trades = new DecentralandMarketplace.Trade[](1);
         trades[0].checks.expiration = block.timestamp;
         trades[0].signer = signer.addr;
         return trades;
     }
 }
 
-contract UnsupportedAssetTypeTests is MarketplaceTests {
+contract UnsupportedAssetTypeTests is DecentralandMarketplaceTests {
     error UnsupportedAssetType(uint256 _assetType);
 
     function test_RevertsIfAssetTypeIsInvalid() public {
         uint256 invalidAssetType = 100;
 
-        Marketplace.Trade[] memory trades = _getBaseTrades();
-        trades[0].sent = new Marketplace.Asset[](1);
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].sent = new DecentralandMarketplace.Asset[](1);
         trades[0].sent[0].assetType = invalidAssetType;
         trades[0].signature = signTrade(trades[0]);
 
@@ -93,7 +92,7 @@ contract UnsupportedAssetTypeTests is MarketplaceTests {
     }
 }
 
-contract TransferERC20Tests is MarketplaceTests {
+contract TransferERC20Tests is DecentralandMarketplaceTests {
     IERC20 erc20;
     uint256 erc20Sent;
     address erc20OriginalHolder;
@@ -109,9 +108,9 @@ contract TransferERC20Tests is MarketplaceTests {
         erc20OriginalHolder = 0x673e6B75a58354919FF5db539AA426727B385D17;
     }
 
-    function _getBaseTradesForSent() private view returns (Marketplace.Trade[] memory) {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
-        trades[0].sent = new Marketplace.Asset[](1);
+    function _getBaseTradesForSent() private view returns (DecentralandMarketplace.Trade[] memory) {
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].sent = new DecentralandMarketplace.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC20();
         trades[0].sent[0].contractAddress = address(erc20);
         trades[0].sent[0].value = erc20Sent;
@@ -119,9 +118,9 @@ contract TransferERC20Tests is MarketplaceTests {
         return trades;
     }
 
-    function _getBaseTradesForReceived() private view returns (Marketplace.Trade[] memory) {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
-        trades[0].received = new Marketplace.Asset[](1);
+    function _getBaseTradesForReceived() private view returns (DecentralandMarketplace.Trade[] memory) {
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].received = new DecentralandMarketplace.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_ERC20();
         trades[0].received[0].contractAddress = address(erc20);
         trades[0].received[0].value = erc20Sent;
@@ -133,7 +132,7 @@ contract TransferERC20Tests is MarketplaceTests {
         vm.prank(erc20OriginalHolder);
         erc20.transfer(signer.addr, erc20Sent);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectRevert("ERC20: transfer amount exceeds allowance");
@@ -144,7 +143,7 @@ contract TransferERC20Tests is MarketplaceTests {
         vm.prank(erc20OriginalHolder);
         erc20.transfer(other, erc20Sent);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert("ERC20: transfer amount exceeds allowance");
@@ -155,7 +154,7 @@ contract TransferERC20Tests is MarketplaceTests {
         vm.prank(signer.addr);
         erc20.approve(address(marketplace), erc20Sent);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectRevert("ERC20: transfer amount exceeds balance");
@@ -166,7 +165,7 @@ contract TransferERC20Tests is MarketplaceTests {
         vm.prank(other);
         erc20.approve(address(marketplace), erc20Sent);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert("ERC20: transfer amount exceeds balance");
@@ -180,7 +179,7 @@ contract TransferERC20Tests is MarketplaceTests {
         vm.prank(erc20OriginalHolder);
         erc20.transfer(signer.addr, erc20Sent);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectEmit(address(erc20));
@@ -198,7 +197,7 @@ contract TransferERC20Tests is MarketplaceTests {
         vm.prank(erc20OriginalHolder);
         erc20.transfer(other, erc20Sent);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectEmit(address(erc20));
@@ -210,7 +209,7 @@ contract TransferERC20Tests is MarketplaceTests {
     }
 }
 
-contract TransferERC721Tests is MarketplaceTests {
+contract TransferERC721Tests is DecentralandMarketplaceTests {
     IERC721 erc721;
     uint256 erc721TokenId;
     address erc721OriginalHolder;
@@ -224,9 +223,9 @@ contract TransferERC721Tests is MarketplaceTests {
         erc721OriginalHolder = 0xc1325a7Cb84b41626eDCC97f5a124B592976cd5d;
     }
 
-    function _getBaseTradesForSent() private view returns (Marketplace.Trade[] memory) {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
-        trades[0].sent = new Marketplace.Asset[](1);
+    function _getBaseTradesForSent() private view returns (DecentralandMarketplace.Trade[] memory) {
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].sent = new DecentralandMarketplace.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(erc721);
         trades[0].sent[0].value = erc721TokenId;
@@ -234,9 +233,9 @@ contract TransferERC721Tests is MarketplaceTests {
         return trades;
     }
 
-    function _getBaseTradesForReceived() private view returns (Marketplace.Trade[] memory) {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
-        trades[0].received = new Marketplace.Asset[](1);
+    function _getBaseTradesForReceived() private view returns (DecentralandMarketplace.Trade[] memory) {
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].received = new DecentralandMarketplace.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].received[0].contractAddress = address(erc721);
         trades[0].received[0].value = erc721TokenId;
@@ -248,7 +247,7 @@ contract TransferERC721Tests is MarketplaceTests {
         vm.prank(erc721OriginalHolder);
         erc721.transferFrom(erc721OriginalHolder, signer.addr, erc721TokenId);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectRevert();
@@ -259,7 +258,7 @@ contract TransferERC721Tests is MarketplaceTests {
         vm.prank(erc721OriginalHolder);
         erc721.transferFrom(erc721OriginalHolder, other, erc721TokenId);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert();
@@ -270,7 +269,7 @@ contract TransferERC721Tests is MarketplaceTests {
         vm.prank(signer.addr);
         erc721.setApprovalForAll(address(marketplace), true);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectRevert();
@@ -281,7 +280,7 @@ contract TransferERC721Tests is MarketplaceTests {
         vm.prank(other);
         erc721.setApprovalForAll(address(marketplace), true);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert();
@@ -295,7 +294,7 @@ contract TransferERC721Tests is MarketplaceTests {
         vm.prank(erc721OriginalHolder);
         erc721.transferFrom(erc721OriginalHolder, signer.addr, erc721TokenId);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectEmit(address(erc721));
@@ -312,7 +311,7 @@ contract TransferERC721Tests is MarketplaceTests {
         vm.prank(erc721OriginalHolder);
         erc721.transferFrom(erc721OriginalHolder, other, erc721TokenId);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectEmit(address(erc721));
@@ -323,7 +322,7 @@ contract TransferERC721Tests is MarketplaceTests {
     }
 }
 
-contract TransferCollectionItemTests is MarketplaceTests {
+contract TransferCollectionItemTests is DecentralandMarketplaceTests {
     ICollection collection;
     uint256 collectionItemId;
     address collectionItemOriginalCreator;
@@ -339,9 +338,9 @@ contract TransferCollectionItemTests is MarketplaceTests {
         collectionItemOriginalCreator = 0x3cf368FaeCdb4a4E542c0efD17850ae133688C2a;
     }
 
-    function _getBaseTradesForSent() private view returns (Marketplace.Trade[] memory) {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
-        trades[0].sent = new Marketplace.Asset[](1);
+    function _getBaseTradesForSent() private view returns (DecentralandMarketplace.Trade[] memory) {
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].sent = new DecentralandMarketplace.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721_COLLECTION_ITEM();
         trades[0].sent[0].contractAddress = address(collection);
         trades[0].sent[0].value = collectionItemId;
@@ -349,9 +348,9 @@ contract TransferCollectionItemTests is MarketplaceTests {
         return trades;
     }
 
-    function _getBaseTradesForReceived() private view returns (Marketplace.Trade[] memory) {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
-        trades[0].received = new Marketplace.Asset[](1);
+    function _getBaseTradesForReceived() private view returns (DecentralandMarketplace.Trade[] memory) {
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].received = new DecentralandMarketplace.Asset[](1);
         trades[0].received[0].assetType = marketplace.ASSET_TYPE_ERC721_COLLECTION_ITEM();
         trades[0].received[0].contractAddress = address(collection);
         trades[0].received[0].value = collectionItemId;
@@ -360,7 +359,7 @@ contract TransferCollectionItemTests is MarketplaceTests {
     }
 
     function test_RevertsIfSignerIsNotTheCreator() public {
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectRevert(NotCreator.selector);
@@ -368,7 +367,7 @@ contract TransferCollectionItemTests is MarketplaceTests {
     }
 
     function test_RevertsIfCallerIsNotTheCreator() public {
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert(NotCreator.selector);
@@ -379,7 +378,7 @@ contract TransferCollectionItemTests is MarketplaceTests {
         vm.prank(collectionItemOriginalCreator);
         collection.transferCreatorship(signer.addr);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectRevert("_issueToken: CALLER_CAN_NOT_MINT");
@@ -390,7 +389,7 @@ contract TransferCollectionItemTests is MarketplaceTests {
         vm.prank(collectionItemOriginalCreator);
         collection.transferCreatorship(other);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectRevert("_issueToken: CALLER_CAN_NOT_MINT");
@@ -408,7 +407,7 @@ contract TransferCollectionItemTests is MarketplaceTests {
         setMintersValues[0] = true;
         collection.setMinters(setMintersMinters, setMintersValues);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
         vm.prank(other);
         vm.expectEmit(address(collection));
@@ -430,9 +429,9 @@ contract TransferCollectionItemTests is MarketplaceTests {
         setMintersValues[0] = true;
         collection.setMinters(setMintersMinters, setMintersValues);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForSent();
 
-        MarketplaceHarness.MetaTransaction memory metaTx;
+        DecentralandMarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -461,7 +460,7 @@ contract TransferCollectionItemTests is MarketplaceTests {
         setMintersValues[0] = true;
         collection.setMinters(setMintersMinters, setMintersValues);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
         vm.prank(other);
         vm.expectEmit(address(collection));
@@ -483,9 +482,9 @@ contract TransferCollectionItemTests is MarketplaceTests {
         setMintersValues[0] = true;
         collection.setMinters(setMintersMinters, setMintersValues);
 
-        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTradesForReceived();
 
-        MarketplaceHarness.MetaTransaction memory metaTx;
+        DecentralandMarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -504,15 +503,15 @@ contract TransferCollectionItemTests is MarketplaceTests {
     }
 }
 
-contract ExecuteMetaTransactionTests is MarketplaceTests {
+contract ExecuteMetaTransactionTests is DecentralandMarketplaceTests {
     error Expired();
     error MetaTransactionFailedWithoutReason();
 
     function test_RevertsIfNonceIsInvalid() public {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        MarketplaceHarness.MetaTransaction memory metaTx;
+        DecentralandMarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 1;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -525,10 +524,10 @@ contract ExecuteMetaTransactionTests is MarketplaceTests {
     }
 
     function test_RevertsIfFromIsInvalid() public {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        MarketplaceHarness.MetaTransaction memory metaTx;
+        DecentralandMarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = other;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -541,10 +540,10 @@ contract ExecuteMetaTransactionTests is MarketplaceTests {
     }
 
     function test_EmitMetaTransactionExecutedEvent() public {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].signature = signTrade(trades[0]);
 
-        MarketplaceHarness.MetaTransaction memory metaTx;
+        DecentralandMarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -558,11 +557,11 @@ contract ExecuteMetaTransactionTests is MarketplaceTests {
     }
 
     function test_RevertsIfTradeIsExpiredWithBubbledUpError() public {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
         trades[0].checks.expiration = block.timestamp - 1;
         trades[0].signature = signTrade(trades[0]);
 
-        MarketplaceHarness.MetaTransaction memory metaTx;
+        DecentralandMarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -575,14 +574,14 @@ contract ExecuteMetaTransactionTests is MarketplaceTests {
     }
 
     function test_RevertsIfERC721AssetHasContractAddressZeroWithWithoutReasonError() public {
-        Marketplace.Trade[] memory trades = _getBaseTrades();
-        trades[0].sent = new Marketplace.Asset[](1);
+        DecentralandMarketplace.Trade[] memory trades = _getBaseTrades();
+        trades[0].sent = new DecentralandMarketplace.Asset[](1);
         trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
         trades[0].sent[0].contractAddress = address(0);
         trades[0].sent[0].value = 1;
         trades[0].signature = signTrade(trades[0]);
 
-        MarketplaceHarness.MetaTransaction memory metaTx;
+        DecentralandMarketplaceHarness.MetaTransaction memory metaTx;
         metaTx.nonce = 0;
         metaTx.from = metaTxSigner.addr;
         metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
@@ -592,5 +591,24 @@ contract ExecuteMetaTransactionTests is MarketplaceTests {
         vm.prank(other);
         vm.expectRevert(MetaTransactionFailedWithoutReason.selector);
         marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+    }
+}
+
+contract UpdateCouponsTests is DecentralandMarketplaceTests {
+    event CouponManagerUpdated(address indexed _caller, address indexed _couponManager);
+
+    error OwnableUnauthorizedAccount(address _account);
+
+    function test_RevertsIfNotOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateCouponManager(other);
+    }
+
+    function test_CouponManagerUpdated() public {
+        vm.prank(owner);
+        vm.expectEmit(address(marketplace));
+        emit CouponManagerUpdated(owner, other);
+        marketplace.updateCouponManager(other);
     }
 }

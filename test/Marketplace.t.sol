@@ -4,14 +4,14 @@ pragma solidity ^0.8.20;
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 import {ERC1271WalletMock} from "@openzeppelin/contracts/mocks/ERC1271WalletMock.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {Marketplace} from "../src/Marketplace.sol";
-import {MockExternalChecks} from "../src/mocks/MockExternalChecks.sol";
+import {Marketplace} from "src/marketplace/Marketplace.sol";
+import {MockExternalChecks} from "src/mocks/MockExternalChecks.sol";
+import {EIP712} from "src/common/EIP712.sol";
 
 contract MarketplaceHarness is Marketplace {
-    constructor(address _owner, address _couponManager, string memory _eip712Name, string memory _eip712Version)
-        Marketplace(_owner, _couponManager, _eip712Name, _eip712Version)
-    {}
+    constructor(address _owner) Ownable(_owner) EIP712("Marketplace", "1.0.0") {}
 
     function eip712Name() external view returns (string memory) {
         return _EIP712Name();
@@ -39,7 +39,7 @@ abstract contract MarketplaceTests is Test {
     function setUp() public virtual {
         owner = vm.addr(0x1);
         other = vm.addr(0x2);
-        marketplace = new MarketplaceHarness(owner, address(0), "Marketplace", "1.0.0");
+        marketplace = new MarketplaceHarness(owner);
         signer = vm.createWallet("signer");
     }
 
@@ -126,23 +126,6 @@ contract UnpauseTests is MarketplaceTests {
         vm.prank(owner);
         marketplace.unpause();
         assertEq(marketplace.paused(), false);
-    }
-}
-
-contract UpdateCouponsTests is MarketplaceTests {
-    event CouponManagerUpdated(address indexed _caller, address indexed _couponManager);
-
-    function test_RevertsIfNotOwner() public {
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
-        marketplace.updateCouponManager(other);
-    }
-
-    function test_CouponManagerUpdated() public {
-        vm.prank(owner);
-        vm.expectEmit(address(marketplace));
-        emit CouponManagerUpdated(owner, other);
-        marketplace.updateCouponManager(other);
     }
 }
 

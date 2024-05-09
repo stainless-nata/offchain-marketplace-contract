@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import {EIP712} from "./EIP712.sol";
+import {EIP712} from "src/common/EIP712.sol";
 
 /**
  * @dev Modified implementation of Decentraland's NativeMetaTransaction to address specific requirements.

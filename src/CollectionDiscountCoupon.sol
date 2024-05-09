@@ -3,9 +3,10 @@ pragma solidity ^0.8.20;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-import {Types} from "../common/Types.sol";
-import {ICoupon} from "../interfaces/ICoupon.sol";
-import {ICollection} from "../interfaces/ICollection.sol";
+import {CouponTypes} from "src/coupons/CouponTypes.sol";
+import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
+import {ICoupon} from "src/coupons/ICoupon.sol";
+import {ICollection} from "src/ICollection.sol";
 
 contract CollectionDiscountCoupon is ICoupon {
     struct CollectionDiscountCouponData {
@@ -21,12 +22,12 @@ contract CollectionDiscountCoupon is ICoupon {
     error InvalidProof(address _collectionAddress);
     error SignerIsNotTheCreator(address _signer, address _creator);
 
-    function applyCoupon(Types.Trade memory _trade, Types.Coupon memory _coupon) external view returns (Types.Trade memory) {
+    function applyCoupon(MarketplaceTypes.Trade memory _trade, CouponTypes.Coupon memory _coupon) external view returns (MarketplaceTypes.Trade memory) {
         if (_trade.sent.length != 1) {
             revert TradesWithOneSentCollectionItemAllowed();
         }
 
-        Types.Asset memory sentAsset = _trade.sent[0];
+        MarketplaceTypes.Asset memory sentAsset = _trade.sent[0];
 
         ICollection collection = ICollection(sentAsset.contractAddress);
 
