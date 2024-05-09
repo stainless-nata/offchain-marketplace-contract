@@ -6,9 +6,9 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Verifications} from "./common/Verifications.sol";
 import {EIP712} from "./external/EIP712.sol";
 import {ICoupon} from "./interfaces/ICoupon.sol";
-import {ICouponManager} from "./interfaces/ICouponManager.sol";
+import {NativeMetaTransaction} from "./external/NativeMetaTransaction.sol";
 
-contract CouponManager is ICouponManager, Verifications {
+contract CouponManager is NativeMetaTransaction, Verifications {
     address public marketplace;
     mapping(address => bool) public allowedCoupons;
 
@@ -97,5 +97,9 @@ contract CouponManager is ICouponManager, Verifications {
         allowedCoupons[_coupon] = _value;
 
         emit AllowedCouponsUpdated(_msgSender(), _coupon, _value);
+    }
+
+    function _msgSender() internal view override returns (address) {
+        return _getMsgSender();
     }
 }

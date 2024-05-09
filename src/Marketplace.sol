@@ -131,13 +131,13 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
         }
     }
 
-    function _msgSender() internal view override returns (address) {
-        return _getMsgSender();
-    }
-
     function _updateCouponManager(address _couponManager) private {
         couponManager = ICouponManager(_couponManager);
 
         emit CouponManagerUpdated(_msgSender(), _couponManager);
+    }
+
+    function _msgSender() internal view override returns (address) {
+        return _getMsgSender();
     }
 }

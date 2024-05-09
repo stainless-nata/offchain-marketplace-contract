@@ -10,12 +10,23 @@ import {ICoupon} from "../src/interfaces/ICoupon.sol";
 import {MockCoupon} from "../src/mocks/MockCoupon.sol";
 
 contract CouponManagerHarness is CouponManager {
-    constructor(address _marketplace, address _owner, address[] memory _allowedCoupons)
-        CouponManager(_marketplace, _owner, _allowedCoupons)
-    {}
+    constructor(address _marketplace, address _owner, address[] memory _allowedCoupons) CouponManager(_marketplace, _owner, _allowedCoupons) {}
 
     function eip712CouponHash(Coupon memory _coupon) external view returns (bytes32) {
         return _hashTypedDataV4(_hashCoupon(_coupon));
+    }
+
+    function eip712MetaTransactionHash(MetaTransaction memory _metaTx) external view returns (bytes32) {
+        return _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    keccak256(bytes("MetaTransaction(uint256 nonce,address from,bytes functionData)")),
+                    _metaTx.nonce,
+                    _metaTx.from,
+                    keccak256(_metaTx.functionData)
+                )
+            )
+        );
     }
 }
 
@@ -25,6 +36,7 @@ abstract contract CouponsTests is Test {
     address allowedCoupon;
     address other;
     VmSafe.Wallet signer;
+    VmSafe.Wallet metaTxSigner;
     CouponManagerHarness couponManager;
     ICoupon mockCoupon;
 
@@ -38,6 +50,7 @@ abstract contract CouponsTests is Test {
         allowedCoupon = address(mockCoupon);
         other = address(4);
         signer = vm.createWallet("signer");
+        metaTxSigner = vm.createWallet("metaTxSigner");
 
         address[] memory allowedCoupons = new address[](1);
         allowedCoupons[0] = allowedCoupon;
@@ -47,6 +60,11 @@ abstract contract CouponsTests is Test {
 
     function signCoupon(Types.Coupon memory _coupon) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, couponManager.eip712CouponHash(_coupon));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function signMetaTx(CouponManager.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, couponManager.eip712MetaTransactionHash(_metaTx));
         return abi.encodePacked(r, s, v);
     }
 }
@@ -69,11 +87,40 @@ contract UpdateMarketplaceTests is CouponsTests {
         couponManager.updateMarketplace(marketplace);
     }
 
+    function test_RevertsIfCallerIsNotOwner_MetaTx() public {
+        CouponManager.MetaTransaction memory metaTx;
+        metaTx.nonce = 0;
+        metaTx.from = metaTxSigner.addr;
+        metaTx.functionData = abi.encodeWithSelector(couponManager.updateMarketplace.selector, other);
+        bytes memory metaTxSignature = signMetaTx(metaTx);
+
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, metaTxSigner.addr));
+        couponManager.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+    }
+
     function test_UpdatesTheMarketplace() public {
         vm.prank(owner);
         vm.expectEmit(address(couponManager));
         emit MarketplaceUpdated(owner, other);
         couponManager.updateMarketplace(other);
+        assertEq(couponManager.marketplace(), other);
+    }
+
+    function test_UpdatesTheMarketplace_MetaTx() public {
+        vm.prank(owner);
+        couponManager.transferOwnership(metaTxSigner.addr);
+
+        CouponManager.MetaTransaction memory metaTx;
+        metaTx.nonce = 0;
+        metaTx.from = metaTxSigner.addr;
+        metaTx.functionData = abi.encodeWithSelector(couponManager.updateMarketplace.selector, other);
+        bytes memory metaTxSignature = signMetaTx(metaTx);
+
+        vm.prank(other);
+        vm.expectEmit(address(couponManager));
+        emit MarketplaceUpdated(metaTxSigner.addr, other);
+        couponManager.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
         assertEq(couponManager.marketplace(), other);
     }
 }
@@ -194,7 +241,7 @@ contract ApplyCouponTests is CouponsTests {
 
 contract CancelSignatureTests is CouponsTests {
     event SignatureCancelled(address indexed _caller, bytes32 indexed _signature);
-    
+
     function test_CanSendEmptyListOfCoupons() public {
         vm.prank(other);
         couponManager.cancelSignature(new Types.Coupon[](0));
@@ -202,7 +249,7 @@ contract CancelSignatureTests is CouponsTests {
 
     function test_RevertsIfInvalidSigner() public {
         Types.Coupon[] memory couponList = new Types.Coupon[](1);
-        couponList[0].signature = signCoupon(couponList[0]); 
+        couponList[0].signature = signCoupon(couponList[0]);
 
         vm.prank(other);
         vm.expectRevert(InvalidSignature.selector);
@@ -211,7 +258,7 @@ contract CancelSignatureTests is CouponsTests {
 
     function test_SignatureCancelled() public {
         Types.Coupon[] memory couponList = new Types.Coupon[](1);
-        couponList[0].signature = signCoupon(couponList[0]); 
+        couponList[0].signature = signCoupon(couponList[0]);
 
         bytes32 hashedSignature = keccak256(couponList[0].signature);
 
@@ -228,7 +275,7 @@ contract CancelSignatureTests is CouponsTests {
     function test_MultipleSignaturesCancelled() public {
         Types.Coupon[] memory couponList = new Types.Coupon[](2);
         couponList[0].checks.expiration = block.timestamp;
-        couponList[0].signature = signCoupon(couponList[0]); 
+        couponList[0].signature = signCoupon(couponList[0]);
         couponList[1].checks.expiration = block.timestamp + 1;
         couponList[1].signature = signCoupon(couponList[1]);
 
@@ -253,7 +300,7 @@ contract CancelSignatureTests is CouponsTests {
 
     function test_CanCancelTheSameSignatureMultipleTimes() public {
         Types.Coupon[] memory couponList = new Types.Coupon[](2);
-        couponList[0].signature = signCoupon(couponList[0]); 
+        couponList[0].signature = signCoupon(couponList[0]);
         couponList[1].signature = signCoupon(couponList[1]);
 
         bytes32 hashedSignature1 = keccak256(couponList[0].signature);
