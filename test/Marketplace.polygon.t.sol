@@ -42,20 +42,29 @@ contract MarketplaceHarness is Marketplace {
 
 abstract contract MarketplaceTests is Test {
     VmSafe.Wallet signer;
+    VmSafe.Wallet metaTxSigner;
     address other;
     MarketplaceHarness marketplace;
+
+    event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
 
     function setUp() public virtual {
         uint256 forkId = vm.createFork("https://rpc.decentraland.org/polygon", 56395304); // Apr-29-2024 07:23:50 PM +UTC
         vm.selectFork(forkId);
 
         signer = vm.createWallet("signer");
+        metaTxSigner = vm.createWallet("metaTxSigner");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
         marketplace = new MarketplaceHarness(0x0E659A116e161d8e502F9036bAbDA51334F2667E, address(0), "Marketplace", "1.0.0");
     }
 
     function signTrade(Marketplace.Trade memory _trade) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, marketplace.eip712TradeHash(_trade));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function signMetaTx(Marketplace.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_metaTx));
         return abi.encodePacked(r, s, v);
     }
 
@@ -410,6 +419,37 @@ contract TransferCollectionItemTests is MarketplaceTests {
         assertEq(collection.ownerOf(expectedTokenId), other);
     }
 
+    function test_MintsAndTranfersTheItemToTheCaller_MetaTx() public {
+        vm.prank(collectionItemOriginalCreator);
+        collection.transferCreatorship(signer.addr);
+
+        vm.prank(signer.addr);
+        address[] memory setMintersMinters = new address[](1);
+        setMintersMinters[0] = address(marketplace);
+        bool[] memory setMintersValues = new bool[](1);
+        setMintersValues[0] = true;
+        collection.setMinters(setMintersMinters, setMintersValues);
+
+        Marketplace.Trade[] memory trades = _getBaseTradesForSent();
+
+        MarketplaceHarness.MetaTransaction memory metaTx;
+        metaTx.nonce = 0;
+        metaTx.from = metaTxSigner.addr;
+        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+
+        bytes memory metaTxSignature = signMetaTx(metaTx);
+
+        vm.prank(other);
+        vm.expectEmit(address(marketplace));
+        emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
+        vm.expectEmit(address(collection));
+        uint256 expectedTokenId = 1053122916685571866979180276836704323188950954005491112543109775772;
+        emit Transfer(address(0), metaTxSigner.addr, expectedTokenId);
+        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+
+        assertEq(collection.ownerOf(expectedTokenId), metaTxSigner.addr);
+    }
+
     function test_MintsAndTranfersTheItemToTheSigner() public {
         vm.prank(collectionItemOriginalCreator);
         collection.transferCreatorship(other);
@@ -431,26 +471,42 @@ contract TransferCollectionItemTests is MarketplaceTests {
 
         assertEq(collection.ownerOf(expectedTokenId), signer.addr);
     }
+
+    function test_MintsAndTranfersTheItemToTheSigner_MetaTx() public {
+        vm.prank(collectionItemOriginalCreator);
+        collection.transferCreatorship(metaTxSigner.addr);
+
+        vm.prank(metaTxSigner.addr);
+        address[] memory setMintersMinters = new address[](1);
+        setMintersMinters[0] = address(marketplace);
+        bool[] memory setMintersValues = new bool[](1);
+        setMintersValues[0] = true;
+        collection.setMinters(setMintersMinters, setMintersValues);
+
+        Marketplace.Trade[] memory trades = _getBaseTradesForReceived();
+
+        MarketplaceHarness.MetaTransaction memory metaTx;
+        metaTx.nonce = 0;
+        metaTx.from = metaTxSigner.addr;
+        metaTx.functionData = abi.encodeWithSelector(marketplace.accept.selector, trades);
+
+        bytes memory metaTxSignature = signMetaTx(metaTx);
+
+        vm.prank(other);
+        vm.expectEmit(address(marketplace));
+        emit MetaTransactionExecuted(metaTx.from, other, metaTx.functionData);
+        vm.expectEmit(address(collection));
+        uint256 expectedTokenId = 1053122916685571866979180276836704323188950954005491112543109775772;
+        emit Transfer(address(0), signer.addr, expectedTokenId);
+        marketplace.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
+
+        assertEq(collection.ownerOf(expectedTokenId), signer.addr);
+    }
 }
 
 contract ExecuteMetaTransactionTests is MarketplaceTests {
-    VmSafe.Wallet metaTxSigner;
-
-    event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
-
     error Expired();
     error MetaTransactionFailedWithoutReason();
-
-    function setUp() public override {
-        super.setUp();
-        metaTxSigner = vm.createWallet("metaTxSigner");
-    }
-
-    function signMetaTx(MarketplaceHarness.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_metaTx));
-
-        return abi.encodePacked(r, s, v);
-    }
 
     function test_RevertsIfNonceIsInvalid() public {
         Marketplace.Trade[] memory trades = _getBaseTrades();
