@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Signatures} from "src/common/Signatures.sol";
 import {CommonTypes} from "src/common/CommonTypes.sol";
 
+/// @notice Contract that provides a function to verify Checks.
 abstract contract Verifications is Signatures, CommonTypes {
     /// bytes4(keccak256("balanceOf(address)"))
     bytes4 private constant BALANCE_OF_SELECTOR = 0x70a08231;
@@ -11,15 +12,25 @@ abstract contract Verifications is Signatures, CommonTypes {
     /// bytes4(keccak256("ownerOf(uint256)"))
     bytes4 private constant OWNER_OF_SELECTOR = 0x6352211e;
 
+    error UsingCancelledSignature();
+    error SignatureReuse();
     error NotEffective();
     error InvalidContractSignatureIndex();
     error InvalidSignerSignatureIndex();
     error Expired();
     error NotAllowed();
     error ExternalChecksFailed();
-    error UsingCancelledSignature();
 
-    function _verifyChecks(Checks memory _checks, bytes32 _hashedSignature, uint256 _currentSignatureUses, address _signer, address _caller) internal view {
+    /// @dev Verifies that the Check values are correct and that the signature has not been canceled or overused.
+    /// @param _checks The Checks to verify.
+    /// @param _hashedSignature The hash of the signature.
+    /// @param _currentSignatureUses The number of times the signature has been used.
+    /// @param _signer The address that created the signature.
+    /// @param _caller The address that sent the transaction.
+    function _verifyChecks(Checks memory _checks, bytes32 _hashedSignature, uint256 _currentSignatureUses, address _signer, address _caller)
+        internal
+        view
+    {
         if (cancelledSignatures[_hashedSignature]) {
             revert UsingCancelledSignature();
         }
@@ -63,6 +74,19 @@ abstract contract Verifications is Signatures, CommonTypes {
         revert NotAllowed();
     }
 
+    /// @dev Verifies that the external checks are met.
+    /// @param _externalChecks The external checks to verify.
+    /// @param _caller The address that sent the transaction.
+    /// 
+    /// External checks can be defined as required or optional. If any required check fails, the function will revert.
+    /// Regarding optional checks, it only makes sense when there are more than one. If there is only one optional check, even if there are other required checks, it will be treated as required.
+    /// For example:
+    /// - 1 optional check === 1 required check.
+    /// - 1 required check + 1 optional check === 2 required checks.
+    ///
+    /// If the selector is `balanceOf`, it will be checked that the balance is greater than or equal to the `value`.
+    /// If the selector is `ownerOf`, it will be checked that the owner of `value` is the caller.
+    /// Otherwise, the function will call the selector with the caller and expect it returns true.
     function _verifyExternalChecks(ExternalCheck[] memory _externalChecks, address _caller) private view {
         bool hasOptionalChecks = false;
         bool hasPassingOptionalCheck = false;

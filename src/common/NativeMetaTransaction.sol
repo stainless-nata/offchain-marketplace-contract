@@ -15,6 +15,7 @@ import {EIP712} from "src/common/EIP712.sol";
  * 1. Updated solidity versin to 0.8.20.
  * 2. Updated imports to use our modified EIP712 contract and the non upgradeable ECDSA contract from OpenZeppelin.
  * 3. Removed init functions. This is not an upgradeable contract so they are not required.
+ * 4. Fixed bubbling up of errors. The linked implementation does not seem to work as expected.
  *
  * All comments found underneath are from the original implementation.
  */

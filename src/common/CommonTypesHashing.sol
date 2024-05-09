@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {CommonTypes} from "src/common/CommonTypes.sol";
 
+/// @notice Hashing of the common types, used for EIP712 signature verification.
 abstract contract CommonTypesHashing is CommonTypes {
     // keccak256("ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
     bytes32 private constant EXTERNAL_CHECK_TYPE_HASH = 0xdf361982fbc6415130c9d78e2e25ec087cf4812d4c0714d41cc56537ee15ac24;

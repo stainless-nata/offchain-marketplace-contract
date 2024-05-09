@@ -7,12 +7,18 @@ import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 import {ICollection} from "src/marketplace/ICollection.sol";
 
+/// @notice Coupon that allows creators to apply discounts to Trades involving their Collections.
 contract CollectionDiscountCoupon is CouponTypes, MarketplaceTypes {
+    /// @notice Schema Discount.
+    /// @param rate The rate of the discount. Must be over 1 million instead of 100. For example, 10% would be 100_000.
+    /// @param root The Merkle root of all the Collections that this Coupon will be valid for.
     struct CollectionDiscountCouponData {
         uint256 rate;
         bytes32 root;
     }
 
+    /// @notice Schema of the data expected from the caller.
+    /// @param proof The Merkle proof used to verify that the Traded collection applies for the discount.
     struct CollectionDiscountCouponCallerData {
         bytes32[] proof;
     }
@@ -21,6 +27,14 @@ contract CollectionDiscountCoupon is CouponTypes, MarketplaceTypes {
     error InvalidProof(address _collectionAddress);
     error SignerIsNotTheCreator(address _signer, address _creator);
 
+    /// @notice Applies the discount to the received assets of the Trade.
+    /// @param _trade The Trade to apply the discount to.
+    /// @param _coupon The Coupon to apply.
+    /// @return - Trade with the discount applied.
+    ///
+    /// Only Trades with one sent Collection item are allowed.
+    ///
+    /// All received assets will have the discount applied. !!!EVEN IF THEY ARE NOT ERC20s!!!.
     function applyCoupon(MarketplaceTypes.Trade memory _trade, CouponTypes.Coupon memory _coupon) external view returns (MarketplaceTypes.Trade memory) {
         if (_trade.sent.length != 1) {
             revert TradesWithOneSentCollectionItemAllowed();
