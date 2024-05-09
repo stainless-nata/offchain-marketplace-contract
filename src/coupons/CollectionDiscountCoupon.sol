@@ -4,10 +4,10 @@ pragma solidity ^0.8.20;
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 import {Types} from "../common/Types.sol";
-import {ICouponImplementation} from "../interfaces/ICouponImplementation.sol";
+import {ICoupon} from "../interfaces/ICoupon.sol";
 import {ICollection} from "../interfaces/ICollection.sol";
 
-contract CollectionDiscountCoupon is ICouponImplementation {
+contract CollectionDiscountCoupon is ICoupon {
     struct CollectionDiscountCouponData {
         uint256 rate;
         bytes32 root;

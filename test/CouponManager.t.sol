@@ -6,12 +6,12 @@ import {VmSafe} from "forge-std/Vm.sol";
 
 import {CouponManager} from "../src/CouponManager.sol";
 import {Types} from "../src/common/Types.sol";
-import {ICouponImplementation} from "../src/interfaces/ICouponImplementation.sol";
+import {ICoupon} from "../src/interfaces/ICoupon.sol";
 import {MockCouponImplementation} from "../src/mocks/MockCouponImplementation.sol";
 
 contract CouponsHarness is CouponManager {
-    constructor(address _marketplace, address _owner, address[] memory _allowedCouponImplementations)
-        CouponManager(_marketplace, _owner, _allowedCouponImplementations)
+    constructor(address _marketplace, address _owner, address[] memory _allowedCoupons)
+        CouponManager(_marketplace, _owner, _allowedCoupons)
     {}
 
     function eip712CouponHash(Coupon memory _coupon) external view returns (bytes32) {
@@ -26,7 +26,7 @@ abstract contract CouponsTests is Test {
     address other;
     VmSafe.Wallet signer;
     CouponsHarness coupons;
-    ICouponImplementation couponImplementation;
+    ICoupon couponImplementation;
 
     error OwnableUnauthorizedAccount(address account);
     error InvalidSignature();
@@ -39,10 +39,10 @@ abstract contract CouponsTests is Test {
         other = address(4);
         signer = vm.createWallet("signer");
 
-        address[] memory allowedCouponImplementations = new address[](1);
-        allowedCouponImplementations[0] = allowedCouponImplementation;
+        address[] memory allowedCoupons = new address[](1);
+        allowedCoupons[0] = allowedCouponImplementation;
 
-        coupons = new CouponsHarness(marketplace, owner, allowedCouponImplementations);
+        coupons = new CouponsHarness(marketplace, owner, allowedCoupons);
     }
 
     function signCoupon(Types.Coupon memory _coupon) internal view returns (bytes memory) {
@@ -55,8 +55,8 @@ contract SetupTests is CouponsTests {
     function test_SetUpState() public view {
         assertEq(coupons.marketplace(), marketplace);
         assertEq(coupons.owner(), owner);
-        assertEq(coupons.allowedCouponImplementations(allowedCouponImplementation), true);
-        assertEq(coupons.allowedCouponImplementations(address(4)), false);
+        assertEq(coupons.allowedCoupons(allowedCouponImplementation), true);
+        assertEq(coupons.allowedCoupons(address(4)), false);
     }
 }
 
@@ -79,29 +79,29 @@ contract UpdateMarketplaceTests is CouponsTests {
 }
 
 contract UpdateAllowedCouponImplementationsTests is CouponsTests {
-    event AllowedCouponImplementationsUpdated(address indexed _caller, address indexed _couponImplementation, bool _value);
+    event AllowedCouponsUpdated(address indexed _caller, address indexed _coupon, bool _value);
 
     error LengthMissmatch();
 
     function test_RevertsIfCallerIsNotOwner() public {
         vm.prank(other);
         vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
-        coupons.updateAllowedCouponImplementations(new address[](0), new bool[](0));
+        coupons.updateAllowedCoupons(new address[](0), new bool[](0));
     }
 
     function test_RevertsIfLengthsMismatch() public {
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(LengthMissmatch.selector));
-        coupons.updateAllowedCouponImplementations(new address[](1), new bool[](0));
+        coupons.updateAllowedCoupons(new address[](1), new bool[](0));
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(LengthMissmatch.selector));
-        coupons.updateAllowedCouponImplementations(new address[](0), new bool[](1));
+        coupons.updateAllowedCoupons(new address[](0), new bool[](1));
     }
 
     function test_UpdatesAllowedCouponImplementations() public {
-        assertEq(coupons.allowedCouponImplementations(allowedCouponImplementation), true);
-        assertEq(coupons.allowedCouponImplementations(other), false);
+        assertEq(coupons.allowedCoupons(allowedCouponImplementation), true);
+        assertEq(coupons.allowedCoupons(other), false);
 
         address[] memory couponImplementations = new address[](2);
         couponImplementations[0] = allowedCouponImplementation;
@@ -113,13 +113,13 @@ contract UpdateAllowedCouponImplementationsTests is CouponsTests {
 
         vm.prank(owner);
         vm.expectEmit(address(coupons));
-        emit AllowedCouponImplementationsUpdated(owner, allowedCouponImplementation, false);
+        emit AllowedCouponsUpdated(owner, allowedCouponImplementation, false);
         vm.expectEmit(address(coupons));
-        emit AllowedCouponImplementationsUpdated(owner, other, true);
-        coupons.updateAllowedCouponImplementations(couponImplementations, values);
+        emit AllowedCouponsUpdated(owner, other, true);
+        coupons.updateAllowedCoupons(couponImplementations, values);
 
-        assertEq(coupons.allowedCouponImplementations(allowedCouponImplementation), false);
-        assertEq(coupons.allowedCouponImplementations(other), true);
+        assertEq(coupons.allowedCoupons(allowedCouponImplementation), false);
+        assertEq(coupons.allowedCoupons(other), true);
     }
 }
 
@@ -127,7 +127,7 @@ contract ApplyCouponTests is CouponsTests {
     event CouponApplied(address indexed _caller, bytes32 indexed _tradeSignature, bytes32 indexed _couponSignature);
 
     error UnauthorizedCaller(address _caller);
-    error CouponImplementationNotAllowed(address _couponImplementation);
+    error CouponNotAllowed(address _coupon);
     error Expired();
 
     function test_RevertsIfCallerIsNotTheMarketplace() public {
@@ -142,17 +142,17 @@ contract ApplyCouponTests is CouponsTests {
     function test_RevertsIfCouponImplementationIsNotAllowed() public {
         Types.Trade memory trade;
         Types.Coupon memory coupon;
-        coupon.couponImplementation = other;
+        coupon.couponAddress = other;
 
         vm.prank(marketplace);
-        vm.expectRevert(abi.encodeWithSelector(CouponImplementationNotAllowed.selector, other));
+        vm.expectRevert(abi.encodeWithSelector(CouponNotAllowed.selector, other));
         coupons.applyCoupon(trade, coupon);
     }
 
     function test_RevertsIfCheckFails() public {
         Types.Trade memory trade;
         Types.Coupon memory coupon;
-        coupon.couponImplementation = allowedCouponImplementation;
+        coupon.couponAddress = allowedCouponImplementation;
 
         vm.prank(marketplace);
         vm.expectRevert(Expired.selector);
@@ -163,7 +163,7 @@ contract ApplyCouponTests is CouponsTests {
         Types.Trade memory trade;
         trade.signer = other;
         Types.Coupon memory coupon;
-        coupon.couponImplementation = allowedCouponImplementation;
+        coupon.couponAddress = allowedCouponImplementation;
         coupon.checks.expiration = block.timestamp;
         coupon.signature = signCoupon(coupon);
 
@@ -176,7 +176,7 @@ contract ApplyCouponTests is CouponsTests {
         Types.Trade memory trade;
         trade.signer = signer.addr;
         Types.Coupon memory coupon;
-        coupon.couponImplementation = allowedCouponImplementation;
+        coupon.couponAddress = allowedCouponImplementation;
         coupon.checks.expiration = block.timestamp;
         coupon.signature = signCoupon(coupon);
 

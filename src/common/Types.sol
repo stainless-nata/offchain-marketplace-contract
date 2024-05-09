@@ -17,7 +17,7 @@ abstract contract Types {
     // keccak256("Trade(Checks checks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
     bytes32 private constant TRADE_TYPE_HASH = 0x6a9beda065389ec62818727007cff89069ad7a2ae71cc72612ba2b563a009bfe;
 
-    // keccak256("Coupon(Checks checks,address couponImplementation,bytes data)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
+    // keccak256("Coupon(Checks checks,address couponAddress,bytes data)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,address[] allowed,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
     bytes32 private constant COUPON_TYPE_HASH = 0x9da4cc9954c195e1c1401bd6fd134f8099228aaac02ebeaee879417d1d6bbf1a;
 
     uint256 public constant ASSET_TYPE_ERC20 = 1;
@@ -63,7 +63,7 @@ abstract contract Types {
     struct Coupon {
         bytes signature;
         Checks checks;
-        address couponImplementation;
+        address couponAddress;
         bytes data;
         bytes callerData;
     }
@@ -140,7 +140,7 @@ abstract contract Types {
     function _hashCoupon(Coupon memory _coupon) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                COUPON_TYPE_HASH, keccak256(abi.encodePacked(_hashChecks(_coupon.checks))), _coupon.couponImplementation, keccak256(_coupon.data)
+                COUPON_TYPE_HASH, keccak256(abi.encodePacked(_hashChecks(_coupon.checks))), _coupon.couponAddress, keccak256(_coupon.data)
             )
         );
     }
