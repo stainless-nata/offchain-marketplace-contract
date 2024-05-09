@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
-import {CollectionDiscountCoupon} from "src/CollectionDiscountCoupon.sol";
+import {CollectionDiscountCoupon} from "src/coupons/CollectionDiscountCoupon.sol";
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 import {MockCollection} from "src/mocks/MockCollection.sol";

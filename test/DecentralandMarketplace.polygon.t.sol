@@ -6,8 +6,8 @@ import {VmSafe} from "forge-std/Vm.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-import {DecentralandMarketplace} from "src/DecentralandMarketplace.sol";
-import {ICollection} from "src/ICollection.sol";
+import {DecentralandMarketplace} from "src/marketplace/DecentralandMarketplace.sol";
+import {ICollection} from "src/marketplace/ICollection.sol";
 
 contract DecentralandMarketplaceHarness is DecentralandMarketplace {
     constructor(address _owner, address _couponManager) DecentralandMarketplace(_owner, _couponManager) {}

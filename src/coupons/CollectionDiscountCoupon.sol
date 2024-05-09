@@ -6,7 +6,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 import {ICoupon} from "src/coupons/ICoupon.sol";
-import {ICollection} from "src/ICollection.sol";
+import {ICollection} from "src/marketplace/ICollection.sol";
 
 contract CollectionDiscountCoupon is ICoupon {
     struct CollectionDiscountCouponData {

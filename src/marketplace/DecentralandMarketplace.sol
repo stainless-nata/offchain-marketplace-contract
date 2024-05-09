@@ -10,8 +10,8 @@ import {Marketplace} from "src/marketplace/Marketplace.sol";
 import {ICouponManager} from "src/coupons/ICouponManager.sol";
 import {EIP712} from "src/common/EIP712.sol";
 import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
-import {IComposable} from "src/IComposable.sol";
-import {ICollection} from "src/ICollection.sol";
+import {IComposable} from "src/marketplace/IComposable.sol";
+import {ICollection} from "src/marketplace/ICollection.sol";
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 
 contract DecentralandMarketplace is Marketplace, NativeMetaTransaction, CouponTypes {
