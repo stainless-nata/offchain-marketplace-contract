@@ -9,7 +9,7 @@ import {Types} from "../src/common/Types.sol";
 import {ICoupon} from "../src/interfaces/ICoupon.sol";
 import {MockCoupon} from "../src/mocks/MockCoupon.sol";
 
-contract CouponsHarness is CouponManager {
+contract CouponManagerHarness is CouponManager {
     constructor(address _marketplace, address _owner, address[] memory _allowedCoupons)
         CouponManager(_marketplace, _owner, _allowedCoupons)
     {}
@@ -25,8 +25,8 @@ abstract contract CouponsTests is Test {
     address allowedCoupon;
     address other;
     VmSafe.Wallet signer;
-    CouponsHarness coupons;
-    ICoupon testCoupon;
+    CouponManagerHarness couponManager;
+    ICoupon mockCoupon;
 
     error OwnableUnauthorizedAccount(address account);
     error InvalidSignature();
@@ -34,29 +34,29 @@ abstract contract CouponsTests is Test {
     function setUp() public {
         marketplace = address(1);
         owner = address(2);
-        testCoupon = new MockCoupon();
-        allowedCoupon = address(testCoupon);
+        mockCoupon = new MockCoupon();
+        allowedCoupon = address(mockCoupon);
         other = address(4);
         signer = vm.createWallet("signer");
 
         address[] memory allowedCoupons = new address[](1);
         allowedCoupons[0] = allowedCoupon;
 
-        coupons = new CouponsHarness(marketplace, owner, allowedCoupons);
+        couponManager = new CouponManagerHarness(marketplace, owner, allowedCoupons);
     }
 
     function signCoupon(Types.Coupon memory _coupon) internal view returns (bytes memory) {
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, coupons.eip712CouponHash(_coupon));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, couponManager.eip712CouponHash(_coupon));
         return abi.encodePacked(r, s, v);
     }
 }
 
 contract SetupTests is CouponsTests {
     function test_SetUpState() public view {
-        assertEq(coupons.marketplace(), marketplace);
-        assertEq(coupons.owner(), owner);
-        assertEq(coupons.allowedCoupons(allowedCoupon), true);
-        assertEq(coupons.allowedCoupons(address(4)), false);
+        assertEq(couponManager.marketplace(), marketplace);
+        assertEq(couponManager.owner(), owner);
+        assertEq(couponManager.allowedCoupons(allowedCoupon), true);
+        assertEq(couponManager.allowedCoupons(address(4)), false);
     }
 }
 
@@ -66,19 +66,19 @@ contract UpdateMarketplaceTests is CouponsTests {
     function test_RevertsIfCallerIsNotOwner() public {
         vm.prank(other);
         vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
-        coupons.updateMarketplace(marketplace);
+        couponManager.updateMarketplace(marketplace);
     }
 
     function test_UpdatesTheMarketplace() public {
         vm.prank(owner);
-        vm.expectEmit(address(coupons));
+        vm.expectEmit(address(couponManager));
         emit MarketplaceUpdated(owner, other);
-        coupons.updateMarketplace(other);
-        assertEq(coupons.marketplace(), other);
+        couponManager.updateMarketplace(other);
+        assertEq(couponManager.marketplace(), other);
     }
 }
 
-contract UpdateAllowedCouponImplementationsTests is CouponsTests {
+contract UpdateAllowedCouponsTests is CouponsTests {
     event AllowedCouponsUpdated(address indexed _caller, address indexed _coupon, bool _value);
 
     error LengthMissmatch();
@@ -86,40 +86,40 @@ contract UpdateAllowedCouponImplementationsTests is CouponsTests {
     function test_RevertsIfCallerIsNotOwner() public {
         vm.prank(other);
         vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
-        coupons.updateAllowedCoupons(new address[](0), new bool[](0));
+        couponManager.updateAllowedCoupons(new address[](0), new bool[](0));
     }
 
     function test_RevertsIfLengthsMismatch() public {
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(LengthMissmatch.selector));
-        coupons.updateAllowedCoupons(new address[](1), new bool[](0));
+        couponManager.updateAllowedCoupons(new address[](1), new bool[](0));
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(LengthMissmatch.selector));
-        coupons.updateAllowedCoupons(new address[](0), new bool[](1));
+        couponManager.updateAllowedCoupons(new address[](0), new bool[](1));
     }
 
-    function test_UpdatesAllowedCouponImplementations() public {
-        assertEq(coupons.allowedCoupons(allowedCoupon), true);
-        assertEq(coupons.allowedCoupons(other), false);
+    function test_UpdatesAllowedCoupons() public {
+        assertEq(couponManager.allowedCoupons(allowedCoupon), true);
+        assertEq(couponManager.allowedCoupons(other), false);
 
-        address[] memory couponImplementations = new address[](2);
-        couponImplementations[0] = allowedCoupon;
-        couponImplementations[1] = other;
+        address[] memory allowedCoupons = new address[](2);
+        allowedCoupons[0] = allowedCoupon;
+        allowedCoupons[1] = other;
 
         bool[] memory values = new bool[](2);
         values[0] = false;
         values[1] = true;
 
         vm.prank(owner);
-        vm.expectEmit(address(coupons));
+        vm.expectEmit(address(couponManager));
         emit AllowedCouponsUpdated(owner, allowedCoupon, false);
-        vm.expectEmit(address(coupons));
+        vm.expectEmit(address(couponManager));
         emit AllowedCouponsUpdated(owner, other, true);
-        coupons.updateAllowedCoupons(couponImplementations, values);
+        couponManager.updateAllowedCoupons(allowedCoupons, values);
 
-        assertEq(coupons.allowedCoupons(allowedCoupon), false);
-        assertEq(coupons.allowedCoupons(other), true);
+        assertEq(couponManager.allowedCoupons(allowedCoupon), false);
+        assertEq(couponManager.allowedCoupons(other), true);
     }
 }
 
@@ -136,7 +136,7 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(other);
         vm.expectRevert(abi.encodeWithSelector(UnauthorizedCaller.selector, other));
-        coupons.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon);
     }
 
     function test_RevertsIfCouponImplementationIsNotAllowed() public {
@@ -146,7 +146,7 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(marketplace);
         vm.expectRevert(abi.encodeWithSelector(CouponNotAllowed.selector, other));
-        coupons.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon);
     }
 
     function test_RevertsIfCheckFails() public {
@@ -156,7 +156,7 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(marketplace);
         vm.expectRevert(Expired.selector);
-        coupons.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon);
     }
 
     function test_RevertsIfSignatureIsInvalid() public {
@@ -169,7 +169,7 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(marketplace);
         vm.expectRevert(InvalidSignature.selector);
-        coupons.applyCoupon(trade, coupon);
+        couponManager.applyCoupon(trade, coupon);
     }
 
     function test_AppliesTheCouponToTheTrade() public {
@@ -180,15 +180,15 @@ contract ApplyCouponTests is CouponsTests {
         coupon.checks.expiration = block.timestamp;
         coupon.signature = signCoupon(coupon);
 
-        assertEq(coupons.signatureUses(keccak256(coupon.signature)), 0);
+        assertEq(couponManager.signatureUses(keccak256(coupon.signature)), 0);
 
         vm.prank(marketplace);
-        vm.expectEmit(address(coupons));
+        vm.expectEmit(address(couponManager));
         emit CouponApplied(marketplace, keccak256(trade.signature), keccak256(coupon.signature));
-        Types.Trade memory updatedTrade = coupons.applyCoupon(trade, coupon);
+        Types.Trade memory updatedTrade = couponManager.applyCoupon(trade, coupon);
         // Mock coupon implementation updates the signer of the trade to address(1337).
         assertEq(updatedTrade.signer, address(1337));
-        assertEq(coupons.signatureUses(keccak256(coupon.signature)), 1);
+        assertEq(couponManager.signatureUses(keccak256(coupon.signature)), 1);
     }
 }
 
@@ -197,7 +197,7 @@ contract CancelSignatureTests is CouponsTests {
     
     function test_CanSendEmptyListOfCoupons() public {
         vm.prank(other);
-        coupons.cancelSignature(new Types.Coupon[](0));
+        couponManager.cancelSignature(new Types.Coupon[](0));
     }
 
     function test_RevertsIfInvalidSigner() public {
@@ -206,7 +206,7 @@ contract CancelSignatureTests is CouponsTests {
 
         vm.prank(other);
         vm.expectRevert(InvalidSignature.selector);
-        coupons.cancelSignature(couponList);
+        couponManager.cancelSignature(couponList);
     }
 
     function test_SignatureCancelled() public {
@@ -215,14 +215,14 @@ contract CancelSignatureTests is CouponsTests {
 
         bytes32 hashedSignature = keccak256(couponList[0].signature);
 
-        assertEq(coupons.cancelledSignatures(hashedSignature), false);
+        assertEq(couponManager.cancelledSignatures(hashedSignature), false);
 
         vm.prank(signer.addr);
-        vm.expectEmit(address(coupons));
+        vm.expectEmit(address(couponManager));
         emit SignatureCancelled(signer.addr, hashedSignature);
-        coupons.cancelSignature(couponList);
+        couponManager.cancelSignature(couponList);
 
-        assertEq(coupons.cancelledSignatures(hashedSignature), true);
+        assertEq(couponManager.cancelledSignatures(hashedSignature), true);
     }
 
     function test_MultipleSignaturesCancelled() public {
@@ -237,18 +237,18 @@ contract CancelSignatureTests is CouponsTests {
 
         assertNotEq(hashedSignature1, hashedSignature2);
 
-        assertEq(coupons.cancelledSignatures(hashedSignature1), false);
-        assertEq(coupons.cancelledSignatures(hashedSignature2), false);
+        assertEq(couponManager.cancelledSignatures(hashedSignature1), false);
+        assertEq(couponManager.cancelledSignatures(hashedSignature2), false);
 
         vm.prank(signer.addr);
-        vm.expectEmit(address(coupons));
+        vm.expectEmit(address(couponManager));
         emit SignatureCancelled(signer.addr, hashedSignature1);
-        vm.expectEmit(address(coupons));
+        vm.expectEmit(address(couponManager));
         emit SignatureCancelled(signer.addr, hashedSignature2);
-        coupons.cancelSignature(couponList);
+        couponManager.cancelSignature(couponList);
 
-        assertEq(coupons.cancelledSignatures(hashedSignature1), true);
-        assertEq(coupons.cancelledSignatures(hashedSignature2), true);
+        assertEq(couponManager.cancelledSignatures(hashedSignature1), true);
+        assertEq(couponManager.cancelledSignatures(hashedSignature2), true);
     }
 
     function test_CanCancelTheSameSignatureMultipleTimes() public {
@@ -261,17 +261,17 @@ contract CancelSignatureTests is CouponsTests {
 
         assertEq(hashedSignature1, hashedSignature2);
 
-        assertEq(coupons.cancelledSignatures(hashedSignature1), false);
-        assertEq(coupons.cancelledSignatures(hashedSignature2), false);
+        assertEq(couponManager.cancelledSignatures(hashedSignature1), false);
+        assertEq(couponManager.cancelledSignatures(hashedSignature2), false);
 
         vm.prank(signer.addr);
-        vm.expectEmit(address(coupons));
+        vm.expectEmit(address(couponManager));
         emit SignatureCancelled(signer.addr, hashedSignature1);
-        vm.expectEmit(address(coupons));
+        vm.expectEmit(address(couponManager));
         emit SignatureCancelled(signer.addr, hashedSignature2);
-        coupons.cancelSignature(couponList);
+        couponManager.cancelSignature(couponList);
 
-        assertEq(coupons.cancelledSignatures(hashedSignature1), true);
-        assertEq(coupons.cancelledSignatures(hashedSignature2), true);
+        assertEq(couponManager.cancelledSignatures(hashedSignature1), true);
+        assertEq(couponManager.cancelledSignatures(hashedSignature2), true);
     }
 }
