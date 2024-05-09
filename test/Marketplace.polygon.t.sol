@@ -10,8 +10,8 @@ import {Marketplace} from "../src/Marketplace.sol";
 import {ICollection} from "../src/interfaces/ICollection.sol";
 
 contract MarketplaceHarness is Marketplace {
-    constructor(address _owner, address _coupons, string memory _eip712Name, string memory _eip712Version)
-        Marketplace(_owner, _coupons, _eip712Name, _eip712Version)
+    constructor(address _owner, address _couponManager, string memory _eip712Name, string memory _eip712Version)
+        Marketplace(_owner, _couponManager, _eip712Name, _eip712Version)
     {}
 
     function eip712Name() external view returns (string memory) {

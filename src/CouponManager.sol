@@ -6,9 +6,9 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Verifications} from "./common/Verifications.sol";
 import {EIP712} from "./external/EIP712.sol";
 import {ICouponImplementation} from "./interfaces/ICouponImplementation.sol";
-import {ICoupons} from "./interfaces/ICoupons.sol";
+import {ICouponManager} from "./interfaces/ICouponManager.sol";
 
-contract Coupons is ICoupons, Verifications {
+contract CouponManager is ICouponManager, Verifications {
     address public marketplace;
     mapping(address => bool) public allowedCouponImplementations;
 
@@ -20,7 +20,7 @@ contract Coupons is ICoupons, Verifications {
     error UnauthorizedCaller(address _caller);
     error CouponImplementationNotAllowed(address _couponImplementation);
 
-    constructor(address _marketplace, address _owner, address[] memory _allowedCouponImplementations) EIP712("Coupons", "1.0.0") Ownable(_owner) {
+    constructor(address _marketplace, address _owner, address[] memory _allowedCouponImplementations) EIP712("CouponManager", "1.0.0") Ownable(_owner) {
         _updateMarketplace(_marketplace);
 
         for (uint256 i = 0; i < _allowedCouponImplementations.length; i++) {

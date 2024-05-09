@@ -4,14 +4,14 @@ pragma solidity ^0.8.20;
 import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
-import {Coupons} from "../src/Coupons.sol";
+import {CouponManager} from "../src/CouponManager.sol";
 import {Types} from "../src/common/Types.sol";
 import {ICouponImplementation} from "../src/interfaces/ICouponImplementation.sol";
 import {MockCouponImplementation} from "../src/mocks/MockCouponImplementation.sol";
 
-contract CouponsHarness is Coupons {
+contract CouponsHarness is CouponManager {
     constructor(address _marketplace, address _owner, address[] memory _allowedCouponImplementations)
-        Coupons(_marketplace, _owner, _allowedCouponImplementations)
+        CouponManager(_marketplace, _owner, _allowedCouponImplementations)
     {}
 
     function eip712CouponHash(Coupon memory _coupon) external view returns (bytes32) {

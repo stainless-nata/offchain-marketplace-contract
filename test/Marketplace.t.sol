@@ -9,8 +9,8 @@ import {Marketplace} from "../src/Marketplace.sol";
 import {MockExternalChecks} from "../src/mocks/MockExternalChecks.sol";
 
 contract MarketplaceHarness is Marketplace {
-    constructor(address _owner, address _coupons, string memory _eip712Name, string memory _eip712Version)
-        Marketplace(_owner, _coupons, _eip712Name, _eip712Version)
+    constructor(address _owner, address _couponManager, string memory _eip712Name, string memory _eip712Version)
+        Marketplace(_owner, _couponManager, _eip712Name, _eip712Version)
     {}
 
     function eip712Name() external view returns (string memory) {
@@ -130,19 +130,19 @@ contract UnpauseTests is MarketplaceTests {
 }
 
 contract UpdateCouponsTests is MarketplaceTests {
-    event CouponsUpdated(address indexed _caller, address indexed _coupons);
+    event CouponManagerUpdated(address indexed _caller, address indexed _couponManager);
 
     function test_RevertsIfNotOwner() public {
         vm.prank(other);
         vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
-        marketplace.updateCoupons(other);
+        marketplace.updateCouponManager(other);
     }
 
-    function test_CouponsUpdated() public {
+    function test_CouponManagerUpdated() public {
         vm.prank(owner);
         vm.expectEmit(address(marketplace));
-        emit CouponsUpdated(owner, other);
-        marketplace.updateCoupons(other);
+        emit CouponManagerUpdated(owner, other);
+        marketplace.updateCouponManager(other);
     }
 }
 

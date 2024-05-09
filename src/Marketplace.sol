@@ -7,25 +7,25 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 import {EIP712} from "./external/EIP712.sol";
 import {Verifications} from "./common/Verifications.sol";
-import {ICoupons} from "./interfaces/ICoupons.sol";
+import {ICouponManager} from "./interfaces/ICouponManager.sol";
 import {AssetTransfers} from "./AssetTransfers.sol";
 import {NativeMetaTransaction} from "./external/NativeMetaTransaction.sol";
 
 contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pausable, ReentrancyGuard {
-    ICoupons public coupons;
+    ICouponManager public couponManager;
     mapping(bytes32 => bool) public usedTradeIds;
 
-    event CouponsUpdated(address indexed _caller, address indexed _coupons);
+    event CouponManagerUpdated(address indexed _caller, address indexed _couponManager);
     event Traded(address indexed _caller, bytes32 indexed _signature);
 
     error UsedTradeId();
     error TradesAndCouponsLengthMismatch();
 
-    constructor(address _owner, address _coupons, string memory _eip712Name, string memory _eip712Version)
+    constructor(address _owner, address _couponManager, string memory _eip712Name, string memory _eip712Version)
         Ownable(_owner)
         EIP712(_eip712Name, _eip712Version)
     {
-        _updateCoupons(_coupons);
+        _updateCouponManager(_couponManager);
     }
 
     function pause() external onlyOwner {
@@ -36,8 +36,8 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
         _unpause();
     }
 
-    function updateCoupons(address _coupons) external onlyOwner {
-        _updateCoupons(_coupons);
+    function updateCouponManager(address _couponManager) external onlyOwner {
+        _updateCouponManager(_couponManager);
     }
 
     function cancelSignature(Trade[] calldata _trades) external {
@@ -69,7 +69,7 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
 
         for (uint256 i = 0; i < _trades.length; i++) {
             _verifyTrade(_trades[i], caller);
-            _accept(coupons.applyCoupon(_trades[i], _coupons[i]), caller);
+            _accept(couponManager.applyCoupon(_trades[i], _coupons[i]), caller);
         }
     }
 
@@ -135,9 +135,9 @@ contract Marketplace is NativeMetaTransaction, AssetTransfers, Verifications, Pa
         return _getMsgSender();
     }
 
-    function _updateCoupons(address _coupons) private {
-        coupons = ICoupons(_coupons);
+    function _updateCouponManager(address _couponManager) private {
+        couponManager = ICouponManager(_couponManager);
 
-        emit CouponsUpdated(_msgSender(), _coupons);
+        emit CouponManagerUpdated(_msgSender(), _couponManager);
     }
 }
