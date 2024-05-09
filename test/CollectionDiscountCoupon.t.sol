@@ -10,7 +10,7 @@ import {MockCollection} from "../src/mocks/MockCollection.sol";
 
 contract CollectionDiscountCouponHarness is CollectionDiscountCoupon {}
 
-contract CouponImplementationTests is Test {
+contract CollectionDiscountCouponTests is Test {
     address signer;
     CollectionDiscountCouponHarness collectionDiscountCoupon;
     MockCollection mockCollection;
@@ -22,7 +22,7 @@ contract CouponImplementationTests is Test {
     }
 }
 
-contract ApplyCollectionDiscountCouponTests is CouponImplementationTests {
+contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
     error InvalidProof(address _collectionAddress);
     error SignerIsNotTheCreator(address _signer, address _creator);
     error TradesWithOneSentCollectionItemAllowed();
