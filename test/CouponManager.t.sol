@@ -22,11 +22,11 @@ contract CouponsHarness is CouponManager {
 abstract contract CouponsTests is Test {
     address marketplace;
     address owner;
-    address allowedCouponImplementation;
+    address allowedCoupon;
     address other;
     VmSafe.Wallet signer;
     CouponsHarness coupons;
-    ICoupon couponImplementation;
+    ICoupon testCoupon;
 
     error OwnableUnauthorizedAccount(address account);
     error InvalidSignature();
@@ -34,13 +34,13 @@ abstract contract CouponsTests is Test {
     function setUp() public {
         marketplace = address(1);
         owner = address(2);
-        couponImplementation = new MockCoupon();
-        allowedCouponImplementation = address(couponImplementation);
+        testCoupon = new MockCoupon();
+        allowedCoupon = address(testCoupon);
         other = address(4);
         signer = vm.createWallet("signer");
 
         address[] memory allowedCoupons = new address[](1);
-        allowedCoupons[0] = allowedCouponImplementation;
+        allowedCoupons[0] = allowedCoupon;
 
         coupons = new CouponsHarness(marketplace, owner, allowedCoupons);
     }
@@ -55,7 +55,7 @@ contract SetupTests is CouponsTests {
     function test_SetUpState() public view {
         assertEq(coupons.marketplace(), marketplace);
         assertEq(coupons.owner(), owner);
-        assertEq(coupons.allowedCoupons(allowedCouponImplementation), true);
+        assertEq(coupons.allowedCoupons(allowedCoupon), true);
         assertEq(coupons.allowedCoupons(address(4)), false);
     }
 }
@@ -100,11 +100,11 @@ contract UpdateAllowedCouponImplementationsTests is CouponsTests {
     }
 
     function test_UpdatesAllowedCouponImplementations() public {
-        assertEq(coupons.allowedCoupons(allowedCouponImplementation), true);
+        assertEq(coupons.allowedCoupons(allowedCoupon), true);
         assertEq(coupons.allowedCoupons(other), false);
 
         address[] memory couponImplementations = new address[](2);
-        couponImplementations[0] = allowedCouponImplementation;
+        couponImplementations[0] = allowedCoupon;
         couponImplementations[1] = other;
 
         bool[] memory values = new bool[](2);
@@ -113,12 +113,12 @@ contract UpdateAllowedCouponImplementationsTests is CouponsTests {
 
         vm.prank(owner);
         vm.expectEmit(address(coupons));
-        emit AllowedCouponsUpdated(owner, allowedCouponImplementation, false);
+        emit AllowedCouponsUpdated(owner, allowedCoupon, false);
         vm.expectEmit(address(coupons));
         emit AllowedCouponsUpdated(owner, other, true);
         coupons.updateAllowedCoupons(couponImplementations, values);
 
-        assertEq(coupons.allowedCoupons(allowedCouponImplementation), false);
+        assertEq(coupons.allowedCoupons(allowedCoupon), false);
         assertEq(coupons.allowedCoupons(other), true);
     }
 }
@@ -152,7 +152,7 @@ contract ApplyCouponTests is CouponsTests {
     function test_RevertsIfCheckFails() public {
         Types.Trade memory trade;
         Types.Coupon memory coupon;
-        coupon.couponAddress = allowedCouponImplementation;
+        coupon.couponAddress = allowedCoupon;
 
         vm.prank(marketplace);
         vm.expectRevert(Expired.selector);
@@ -163,7 +163,7 @@ contract ApplyCouponTests is CouponsTests {
         Types.Trade memory trade;
         trade.signer = other;
         Types.Coupon memory coupon;
-        coupon.couponAddress = allowedCouponImplementation;
+        coupon.couponAddress = allowedCoupon;
         coupon.checks.expiration = block.timestamp;
         coupon.signature = signCoupon(coupon);
 
@@ -176,7 +176,7 @@ contract ApplyCouponTests is CouponsTests {
         Types.Trade memory trade;
         trade.signer = signer.addr;
         Types.Coupon memory coupon;
-        coupon.couponAddress = allowedCouponImplementation;
+        coupon.couponAddress = allowedCoupon;
         coupon.checks.expiration = block.timestamp;
         coupon.signature = signCoupon(coupon);
 
