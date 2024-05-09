@@ -43,7 +43,7 @@ abstract contract MarketplaceTests is Test {
         signer = vm.createWallet("signer");
     }
 
-    function signTrade(Marketplace.Trade memory _trade) internal view returns (bytes memory) {
+    function signTrade(MarketplaceHarness.Trade memory _trade) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, marketplace.eip712TradeHash(_trade));
         return abi.encodePacked(r, s, v);
     }
@@ -199,14 +199,14 @@ contract CancelSignatureTests is MarketplaceTests {
     error InvalidSignature();
 
     function test_CanSendAnEmptyArrayOfTrades() public {
-        Marketplace.Trade[] memory trades;
+        MarketplaceHarness.Trade[] memory trades;
 
         vm.prank(other);
         marketplace.cancelSignature(trades);
     }
 
     function test_RevertsIfTheSignerIsNotTheCaller() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signature = signTrade(trades[0]);
 
@@ -216,7 +216,7 @@ contract CancelSignatureTests is MarketplaceTests {
     }
 
     function test_EmitSignatureCancelledEvent() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signature = signTrade(trades[0]);
 
@@ -227,7 +227,7 @@ contract CancelSignatureTests is MarketplaceTests {
     }
 
     function test_CancelledSignaturesReturnsTrueForTheCancelledSignature() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signature = signTrade(trades[0]);
 
@@ -240,7 +240,7 @@ contract CancelSignatureTests is MarketplaceTests {
     }
 
     function test_CanCancelTheSameSignatureMultipleTimes() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signature = signTrade(trades[0]);
 
@@ -255,7 +255,7 @@ contract CancelSignatureTests is MarketplaceTests {
     }
 
     function test_CanCancelMultipleSignaturesInOneCall() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](10);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](10);
 
         for (uint256 i = 0; i < trades.length; i++) {
             trades[i].checks.salt = bytes32(i);
@@ -273,7 +273,7 @@ contract CancelSignatureTests is MarketplaceTests {
     }
 
     function test_RevertsIfOneOfTheMultipleTradesSignaturesCancelledIsInvalid() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](10);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](10);
 
         for (uint256 i = 0; i < trades.length; i++) {
             trades[i].checks.salt = bytes32(i);
@@ -290,7 +290,7 @@ contract CancelSignatureTests is MarketplaceTests {
     function test_RevertsIfERC1271SignatureVerificationFails() public {
         ERC1271WalletMock contractWallet = new ERC1271WalletMock(other);
 
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signature = signTrade(trades[0]);
 
@@ -302,7 +302,7 @@ contract CancelSignatureTests is MarketplaceTests {
     function test_SupportsERC1271SignatureVerification() public {
         ERC1271WalletMock contractWallet = new ERC1271WalletMock(signer.addr);
 
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signature = signTrade(trades[0]);
 
@@ -325,14 +325,14 @@ contract AcceptTests is MarketplaceTests {
     error UsingCancelledSignature();
 
     function test_CanSendAnEmptyArrayOfTrades() public {
-        Marketplace.Trade[] memory trades;
+        MarketplaceHarness.Trade[] memory trades;
 
         vm.prank(other);
         marketplace.accept(trades);
     }
 
     function test_RevertsIfTheSignatureHasBeenCancelled() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signature = signTrade(trades[0]);
 
@@ -345,7 +345,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_RevertsIfTheSignatureHasBeenUsed() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
         trades[0].checks.uses = 1;
@@ -361,7 +361,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_SignatureWithZeroUsesCanBeUsedManyTimes() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
         trades[0].checks.uses = 0;
@@ -375,7 +375,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_SignatureWithTenUsesCanBeUsedTenTimes() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
         trades[0].checks.uses = 10;
@@ -393,7 +393,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_TradeIdIsStoredAfterAllUsesConsumed() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
         trades[0].checks.uses = 3;
@@ -411,7 +411,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_RevertsIfTradeIdHasBeenUsed() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].signer = signer.addr;
         trades[0].checks.uses = 1;
@@ -430,7 +430,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_RevertsIfTradeIsNotEffectiveYet() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.effective = block.timestamp + 1;
 
@@ -440,7 +440,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_RevertsIfContractSignatureIndexIsInvalid() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.contractSignatureIndex = 1;
 
@@ -450,7 +450,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_RevertsIfSignerSignatureIndexIsInvalid() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.signerSignatureIndex = 1;
 
@@ -460,7 +460,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_RevertsIfTradeHasExpired() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp - 1;
 
@@ -470,7 +470,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_RevertsIfCallerNotAllowed() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
         trades[0].checks.allowed = new address[](100);
@@ -485,7 +485,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_CallerCanAcceptIfItIsInTheAllowedList() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
         trades[0].checks.allowed = new address[](100);
@@ -504,11 +504,11 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfBalanceOfRequiredExternalCheckFails() public {
         MockExternalChecks mockExternalChecks = new MockExternalChecks();
 
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
 
-        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](1);
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
@@ -525,11 +525,11 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfOwnerOfRequiredExternalCheckFails() public {
         MockExternalChecks mockExternalChecks = new MockExternalChecks();
 
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
 
-        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](1);
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.ownerOf.selector;
@@ -546,11 +546,11 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfCustomCheckFunctionRequiredExternalCheckFails() public {
         MockExternalChecks mockExternalChecks = new MockExternalChecks();
 
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
 
-        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](1);
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](1);
 
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.customCheckFunction.selector;
@@ -566,11 +566,11 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfOnly1Of2RequiredChecksPass() public {
         MockExternalChecks mockExternalChecks = new MockExternalChecks();
 
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
 
-        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](2);
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
@@ -593,11 +593,11 @@ contract AcceptTests is MarketplaceTests {
     function test_RevertsIfOnlyTheRequiredCheckPassesButTheOptionalNot() public {
         MockExternalChecks mockExternalChecks = new MockExternalChecks();
 
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
 
-        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](2);
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
@@ -620,11 +620,11 @@ contract AcceptTests is MarketplaceTests {
     function test_Only1OptionalCheckIsNeededToPass() public {
         MockExternalChecks mockExternalChecks = new MockExternalChecks();
 
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
 
-        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](2);
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
@@ -649,11 +649,11 @@ contract AcceptTests is MarketplaceTests {
     function test_AllRequiredChecksNeedToPass() public {
         MockExternalChecks mockExternalChecks = new MockExternalChecks();
 
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
 
-        trades[0].checks.externalChecks = new Marketplace.ExternalCheck[](2);
+        trades[0].checks.externalChecks = new MarketplaceHarness.ExternalCheck[](2);
 
         trades[0].checks.externalChecks[0].contractAddress = address(mockExternalChecks);
         trades[0].checks.externalChecks[0].selector = mockExternalChecks.balanceOf.selector;
@@ -676,7 +676,7 @@ contract AcceptTests is MarketplaceTests {
     }
 
     function test_EmitTradedEvent() public {
-        Marketplace.Trade[] memory trades = new Marketplace.Trade[](1);
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
         trades[0].signer = signer.addr;
