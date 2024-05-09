@@ -7,7 +7,7 @@ import {VmSafe} from "forge-std/Vm.sol";
 import {CouponManager} from "../src/CouponManager.sol";
 import {Types} from "../src/common/Types.sol";
 import {ICoupon} from "../src/interfaces/ICoupon.sol";
-import {MockCouponImplementation} from "../src/mocks/MockCouponImplementation.sol";
+import {MockCoupon} from "../src/mocks/MockCoupon.sol";
 
 contract CouponsHarness is CouponManager {
     constructor(address _marketplace, address _owner, address[] memory _allowedCoupons)
@@ -34,7 +34,7 @@ abstract contract CouponsTests is Test {
     function setUp() public {
         marketplace = address(1);
         owner = address(2);
-        couponImplementation = new MockCouponImplementation();
+        couponImplementation = new MockCoupon();
         allowedCouponImplementation = address(couponImplementation);
         other = address(4);
         signer = vm.createWallet("signer");
