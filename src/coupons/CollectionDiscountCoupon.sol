@@ -22,52 +22,38 @@ contract CollectionDiscountCoupon is CouponTypes, MarketplaceTypes {
     }
 
     /// @notice Schema of the data expected from the caller.
-    /// @param proof The Merkle proof used to verify that the Traded collection applies for the discount.
+    /// @param proofs The Merkle proofs to validate that the collection items being traded are valid for the discount
     struct CollectionDiscountCouponCallerData {
-        bytes32[] proof;
+        bytes32[][] proofs;
     }
 
-    error TradesWithOneSentCollectionItemAllowed();
-    error InvalidProof(address _collectionAddress);
-    error SignerIsNotTheCreator(address _signer, address _creator);
-    error InvalidDiscountType(uint256 _discountType);
+    error TradeSentAndProofsLengthMismatch();
+    error InvalidProof(uint256 _index);
+    error SignerIsNotTheCreator(uint256 _index);
+    error InvalidDiscountType();
 
-    /// @notice Applies the discount to the received assets of the Trade.
-    /// @param _trade The Trade to apply the discount to.
-    /// @param _coupon The Coupon to apply.
-    /// @return - Trade with the discount applied.
-    ///
-    /// Only Trades with one sent Collection item are allowed.
-    ///
-    /// All received assets will have the discount applied. !!!EVEN IF THEY ARE NOT ERC20s!!!.
     function applyCoupon(MarketplaceTypes.Trade memory _trade, CouponTypes.Coupon memory _coupon)
         external
         view
         returns (MarketplaceTypes.Trade memory)
     {
-        if (_trade.sent.length != 1) {
-            revert TradesWithOneSentCollectionItemAllowed();
-        }
-
-        MarketplaceTypes.Asset memory sentAsset = _trade.sent[0];
-
-        ICollection collection = ICollection(sentAsset.contractAddress);
-
-        address creator = collection.creator();
-
-        if (creator != _trade.signer) {
-            revert SignerIsNotTheCreator(_trade.signer, creator);
-        }
-
-        address collectionAddress = address(collection);
-
         CollectionDiscountCouponData memory data = abi.decode(_coupon.data, (CollectionDiscountCouponData));
         CollectionDiscountCouponCallerData memory callerData = abi.decode(_coupon.callerData, (CollectionDiscountCouponCallerData));
 
-        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(collectionAddress))));
+        if (_trade.sent.length != callerData.proofs.length) {
+            revert TradeSentAndProofsLengthMismatch();
+        }
 
-        if (!MerkleProof.verify(callerData.proof, data.root, leaf)) {
-            revert InvalidProof(collectionAddress);
+        for (uint256 i = 0; i < _trade.sent.length; i++) {
+            address collectionAddress = _trade.sent[i].contractAddress;
+
+            if (ICollection(collectionAddress).creator() != _trade.signer) {
+                revert SignerIsNotTheCreator(i);
+            }
+
+            if (!MerkleProof.verify(callerData.proofs[i], data.root, keccak256(bytes.concat(keccak256(abi.encode(address(collectionAddress))))))) {
+                revert InvalidProof(i);
+            }
         }
 
         for (uint256 i = 0; i < _trade.received.length; i++) {
@@ -78,7 +64,7 @@ contract CollectionDiscountCoupon is CouponTypes, MarketplaceTypes {
             } else if (data.discountType == DISCOUNT_TYPE_FLAT) {
                 _trade.received[i].value = originalPrice - data.discount;
             } else {
-                revert InvalidDiscountType(data.discountType);
+                revert InvalidDiscountType();
             }
         }
 
