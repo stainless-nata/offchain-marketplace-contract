@@ -27,9 +27,10 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
 
         for (uint256 i = 0; i < _trades.length; i++) {
             Trade memory trade = _trades[i];
+
             _verifyTradeSignature(trade, caller);
-            bytes32 hashedSignature = keccak256(trade.signature);
-            _cancelSignature(hashedSignature);
+            
+            _cancelSignature(keccak256(trade.signature));
         }
     }
 

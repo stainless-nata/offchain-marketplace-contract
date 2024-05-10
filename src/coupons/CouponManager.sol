@@ -51,10 +51,8 @@ contract CouponManager is NativeMetaTransaction, Verifications, CouponTypesHashi
             Coupon memory coupon = _coupons[i];
 
             _verifyCouponSignature(coupon, caller);
-
-            bytes32 hashedSignature = keccak256(coupon.signature);
-
-            _cancelSignature(hashedSignature);
+            
+            _cancelSignature(keccak256(coupon.signature));
         }
     }
 
