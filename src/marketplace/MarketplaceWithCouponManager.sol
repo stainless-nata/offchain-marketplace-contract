@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Marketplace} from "src/marketplace/Marketplace.sol";
-import {ICouponManager} from "src/coupons/ICouponManager.sol";
+import {ICouponManager} from "src/coupons/interfaces/ICouponManager.sol";
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 
 abstract contract MarketplaceWithCouponManager is Marketplace, CouponTypes {

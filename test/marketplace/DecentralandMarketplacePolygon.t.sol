@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarketplacePolygon.sol";
-import {ICollection} from "src/marketplace/ICollection.sol";
+import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
 
 contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon {
     constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate, address _royaltiesManager, uint256 _royaltiesRate)

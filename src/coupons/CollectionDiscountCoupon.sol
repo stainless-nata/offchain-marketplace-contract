@@ -5,7 +5,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
-import {ICollection} from "src/marketplace/ICollection.sol";
+import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
 import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
 
 /// @notice Coupon that allows creators to apply discounts to Trades involving their Collections.

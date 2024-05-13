@@ -8,10 +8,10 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {EIP712} from "src/common/EIP712.sol";
 import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
-import {ICollection} from "src/marketplace/ICollection.sol";
+import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
 import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCouponManager.sol";
 import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
-import {IRoyaltiesManager} from "src/marketplace/IRoyaltiesManager.sol";
+import {IRoyaltiesManager} from "src/marketplace/interfaces/IRoyaltiesManager.sol";
 import {FeeCollector} from "src/marketplace/FeeCollector.sol";
 
 contract DecentralandMarketplacePolygon is

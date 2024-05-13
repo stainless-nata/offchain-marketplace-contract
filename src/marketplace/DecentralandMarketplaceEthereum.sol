@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {EIP712} from "src/common/EIP712.sol";
-import {IComposable} from "src/marketplace/IComposable.sol";
+import {IComposable} from "src/marketplace/interfaces/IComposable.sol";
 import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCouponManager.sol";
 import {DecentralandMarketplaceEthereumAssetTypes} from "src/marketplace/DecentralandMarketplaceEthereumAssetTypes.sol";
 import {FeeCollector} from "src/marketplace/FeeCollector.sol";

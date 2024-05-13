@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
 import {CouponManager} from "src/coupons/CouponManager.sol";
-import {ICoupon} from "src/coupons/ICoupon.sol";
+import {ICoupon} from "src/coupons/interfaces/ICoupon.sol";
 import {MockCoupon} from "src/mocks/MockCoupon.sol";
 
 contract CouponManagerHarness is CouponManager {

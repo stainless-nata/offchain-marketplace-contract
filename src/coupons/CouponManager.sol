@@ -5,7 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Verifications} from "src/common/Verifications.sol";
 import {EIP712} from "src/common/EIP712.sol";
-import {ICoupon} from "src/coupons/ICoupon.sol";
+import {ICoupon} from "src/coupons/interfaces/ICoupon.sol";
 import {CouponTypesHashing} from "src/coupons/CouponTypesHashing.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 

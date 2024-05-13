@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-import {ICollection} from "src/marketplace/ICollection.sol";
+import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
 
 contract MockCollection is ICollection, ERC721 {
     address public creator;

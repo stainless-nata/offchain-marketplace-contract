@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {DecentralandMarketplaceEthereum} from "src/marketplace/DecentralandMarketplaceEthereum.sol";
-import {IComposable} from "src/marketplace/IComposable.sol";
+import {IComposable} from "src/marketplace/interfaces/IComposable.sol";
 
 contract DecentralandMarketplaceEthereumHarness is DecentralandMarketplaceEthereum {
     constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate)
