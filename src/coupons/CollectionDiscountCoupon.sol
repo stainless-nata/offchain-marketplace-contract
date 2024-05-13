@@ -10,14 +10,10 @@ import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/Decentra
 
 /// @notice Coupon that allows creators to apply discounts to Trades involving their Collections.
 contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, CouponTypes, MarketplaceTypes {
-    uint256 public constant DISCOUNT_TYPE_RATE = 1;
-    uint256 public constant DISCOUNT_TYPE_FLAT = 2;
-
     /// @notice Schema Discount.
-    /// @param rate The rate of the discount. Must be over 1 million instead of 100. For example, 10% would be 100_000.
+    /// @param discount The rate of the discount. Must be between over 1 million instead of 100. For example, 10% would be 100_000.
     /// @param root The Merkle root of all the Collections that this Coupon will be valid for.
     struct CollectionDiscountCouponData {
-        uint256 discountType;
         uint256 discount;
         bytes32 root;
     }
@@ -29,10 +25,9 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
     }
 
     error TradeSentAndProofsLengthMismatch();
-    error InvalidProof(uint256 _index);
-    error SignerIsNotTheCreator(uint256 _index);
-    error InvalidDiscountType();
     error UnsupportedSentAssetType(uint256 _index);
+    error SignerIsNotTheCreator(uint256 _index);
+    error InvalidProof(uint256 _index);
     error UnsupportedReceivedAssetType(uint256 _index);
 
     /// @notice Applies the discount to the received items of the Trade.
@@ -76,13 +71,7 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
 
             uint256 originalPrice = _trade.received[i].value;
 
-            if (data.discountType == DISCOUNT_TYPE_RATE) {
-                _trade.received[i].value = originalPrice - originalPrice * data.discount / 1_000_000;
-            } else if (data.discountType == DISCOUNT_TYPE_FLAT) {
-                _trade.received[i].value = originalPrice - data.discount;
-            } else {
-                revert InvalidDiscountType();
-            }
+            _trade.received[i].value = originalPrice - originalPrice * data.discount / 1_000_000;
         }
 
         return _trade;
