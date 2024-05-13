@@ -6,9 +6,10 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {CouponTypes} from "src/coupons/CouponTypes.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 import {ICollection} from "src/marketplace/ICollection.sol";
+import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
 
 /// @notice Coupon that allows creators to apply discounts to Trades involving their Collections.
-contract CollectionDiscountCoupon is CouponTypes, MarketplaceTypes {
+contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, CouponTypes, MarketplaceTypes {
     uint256 public constant DISCOUNT_TYPE_RATE = 1;
     uint256 public constant DISCOUNT_TYPE_FLAT = 2;
 
@@ -31,7 +32,13 @@ contract CollectionDiscountCoupon is CouponTypes, MarketplaceTypes {
     error InvalidProof(uint256 _index);
     error SignerIsNotTheCreator(uint256 _index);
     error InvalidDiscountType();
+    error UnsupportedSentAssetType(uint256 _index);
+    error UnsupportedReceivedAssetType(uint256 _index);
 
+    /// @notice Applies the discount to the received items of the Trade.
+    /// @param _trade The Trade to apply the discount to.
+    /// @param _coupon The Coupon to apply.
+    /// @return - The Trade with the discount applied.
     function applyCoupon(MarketplaceTypes.Trade memory _trade, CouponTypes.Coupon memory _coupon)
         external
         view
@@ -45,7 +52,13 @@ contract CollectionDiscountCoupon is CouponTypes, MarketplaceTypes {
         }
 
         for (uint256 i = 0; i < _trade.sent.length; i++) {
-            address collectionAddress = _trade.sent[i].contractAddress;
+            Asset memory asset = _trade.sent[i];
+
+            if (asset.assetType != ASSET_TYPE_COLLECTION_ITEM) {
+                revert UnsupportedSentAssetType(i);
+            }
+
+            address collectionAddress = asset.contractAddress;
 
             if (ICollection(collectionAddress).creator() != _trade.signer) {
                 revert SignerIsNotTheCreator(i);
@@ -57,6 +70,10 @@ contract CollectionDiscountCoupon is CouponTypes, MarketplaceTypes {
         }
 
         for (uint256 i = 0; i < _trade.received.length; i++) {
+            if (_trade.received[i].assetType != ASSET_TYPE_ERC20) {
+                revert UnsupportedReceivedAssetType(i);
+            }
+
             uint256 originalPrice = _trade.received[i].value;
 
             if (data.discountType == DISCOUNT_TYPE_RATE) {

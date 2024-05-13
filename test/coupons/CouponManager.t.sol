@@ -14,19 +14,6 @@ contract CouponManagerHarness is CouponManager {
     function eip712CouponHash(Coupon memory _coupon) external view returns (bytes32) {
         return _hashTypedDataV4(_hashCoupon(_coupon));
     }
-
-    function eip712MetaTransactionHash(MetaTransaction memory _metaTx) external view returns (bytes32) {
-        return _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    keccak256(bytes("MetaTransaction(uint256 nonce,address from,bytes functionData)")),
-                    _metaTx.nonce,
-                    _metaTx.from,
-                    keccak256(_metaTx.functionData)
-                )
-            )
-        );
-    }
 }
 
 abstract contract CouponsTests is Test {
@@ -61,11 +48,6 @@ abstract contract CouponsTests is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, couponManager.eip712CouponHash(_coupon));
         return abi.encodePacked(r, s, v);
     }
-
-    function signMetaTx(CouponManager.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, couponManager.eip712MetaTransactionHash(_metaTx));
-        return abi.encodePacked(r, s, v);
-    }
 }
 
 contract SetupTests is CouponsTests {
@@ -86,40 +68,11 @@ contract UpdateMarketplaceTests is CouponsTests {
         couponManager.updateMarketplace(marketplace);
     }
 
-    function test_RevertsIfCallerIsNotOwner_MetaTx() public {
-        CouponManager.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(couponManager.updateMarketplace.selector, other);
-        bytes memory metaTxSignature = signMetaTx(metaTx);
-
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, metaTxSigner.addr));
-        couponManager.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
-    }
-
     function test_UpdatesTheMarketplace() public {
         vm.prank(owner);
         vm.expectEmit(address(couponManager));
         emit MarketplaceUpdated(owner, other);
         couponManager.updateMarketplace(other);
-        assertEq(couponManager.marketplace(), other);
-    }
-
-    function test_UpdatesTheMarketplace_MetaTx() public {
-        vm.prank(owner);
-        couponManager.transferOwnership(metaTxSigner.addr);
-
-        CouponManager.MetaTransaction memory metaTx;
-        metaTx.nonce = 0;
-        metaTx.from = metaTxSigner.addr;
-        metaTx.functionData = abi.encodeWithSelector(couponManager.updateMarketplace.selector, other);
-        bytes memory metaTxSignature = signMetaTx(metaTx);
-
-        vm.prank(other);
-        vm.expectEmit(address(couponManager));
-        emit MarketplaceUpdated(metaTxSigner.addr, other);
-        couponManager.executeMetaTransaction(metaTx.from, metaTx.functionData, metaTxSignature);
         assertEq(couponManager.marketplace(), other);
     }
 }

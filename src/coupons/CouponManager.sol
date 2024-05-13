@@ -6,11 +6,10 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Verifications} from "src/common/Verifications.sol";
 import {EIP712} from "src/common/EIP712.sol";
 import {ICoupon} from "src/coupons/ICoupon.sol";
-import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
 import {CouponTypesHashing} from "src/coupons/CouponTypesHashing.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 
-contract CouponManager is NativeMetaTransaction, Verifications, CouponTypesHashing, MarketplaceTypes {
+contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
     address public marketplace;
     mapping(address => bool) public allowedCoupons;
 
@@ -51,7 +50,7 @@ contract CouponManager is NativeMetaTransaction, Verifications, CouponTypesHashi
             Coupon memory coupon = _coupons[i];
 
             _verifyCouponSignature(coupon, caller);
-            
+
             _cancelSignature(keccak256(coupon.signature));
         }
     }
@@ -72,9 +71,10 @@ contract CouponManager is NativeMetaTransaction, Verifications, CouponTypesHashi
         bytes32 hashedCouponSignature = keccak256(_coupon.signature);
         bytes32 hashedTradeSignature = keccak256(_trade.signature);
         uint256 currentSignatureUses = signatureUses[hashedCouponSignature];
+        address signer = _trade.signer;
 
-        _verifyChecks(_coupon.checks, hashedCouponSignature, currentSignatureUses, _trade.signer, caller);
-        _verifyCouponSignature(_coupon, _trade.signer);
+        _verifyChecks(_coupon.checks, hashedCouponSignature, currentSignatureUses, signer, caller);
+        _verifyCouponSignature(_coupon, signer);
 
         emit CouponApplied(caller, hashedTradeSignature, hashedCouponSignature);
 
@@ -97,9 +97,5 @@ contract CouponManager is NativeMetaTransaction, Verifications, CouponTypesHashi
         allowedCoupons[_coupon] = _value;
 
         emit AllowedCouponsUpdated(_msgSender(), _coupon, _value);
-    }
-
-    function _msgSender() internal view override returns (address) {
-        return _getMsgSender();
     }
 }
