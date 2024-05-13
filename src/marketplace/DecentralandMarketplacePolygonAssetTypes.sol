@@ -5,4 +5,5 @@ import {DecentralandMarketplaceEthereumAssetTypes} from "src/marketplace/Decentr
 
 abstract contract DecentralandMarketplacePolygonAssetTypes is DecentralandMarketplaceEthereumAssetTypes {
     uint256 public constant ASSET_TYPE_COLLECTION_ITEM = 3;
+    uint256 public constant ASSET_TYPE_ERC20_WITH_ROYALTIES = 4;
 }

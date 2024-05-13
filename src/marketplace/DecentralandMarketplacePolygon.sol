@@ -11,42 +11,50 @@ import {NativeMetaTransaction} from "src/common/NativeMetaTransaction.sol";
 import {ICollection} from "src/marketplace/ICollection.sol";
 import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCouponManager.sol";
 import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
+import {IRoyaltiesManager} from "src/marketplace/IRoyaltiesManager.sol";
 
 contract DecentralandMarketplacePolygon is DecentralandMarketplacePolygonAssetTypes, MarketplaceWithCouponManager, NativeMetaTransaction {
     address public feeCollector;
     uint256 public feeRate;
+    IRoyaltiesManager public royaltiesManager;
+    uint256 public royaltiesRate;
 
     error NotCreator();
+    error NoRoyaltiesReceiver();
 
-    constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate)
+    constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate, address _royaltiesManager, uint256 _royaltiesRate)
         Ownable(_owner)
-        EIP712("DecentralandMarketplace", "1.0.0")
+        EIP712("DecentralandMarketplacePolygon", "1.0.0")
         MarketplaceWithCouponManager(_couponManager)
     {
         feeCollector = _feeCollector;
         feeRate = _feeRate;
+        royaltiesManager = IRoyaltiesManager(_royaltiesManager);
+        royaltiesRate = _royaltiesRate;
     }
 
     function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal override {
         uint256 assetType = _asset.assetType;
 
         if (assetType == ASSET_TYPE_ERC20) {
-            _transferERC20(_asset, _from);
+            _transferERC20(_asset, _from, feeRate, feeCollector);
         } else if (assetType == ASSET_TYPE_ERC721) {
             _transferERC721(_asset, _from);
         } else if (assetType == ASSET_TYPE_COLLECTION_ITEM) {
             _transferERC721CollectionItem(_asset, _signer, _caller);
+        } else if (assetType == ASSET_TYPE_ERC20_WITH_ROYALTIES) {
+            _transferERC20WithRoyalties(_asset, _signer);
         } else {
             revert UnsupportedAssetType(assetType);
         }
     }
 
-    function _transferERC20(Asset memory _asset, address _from) private {
+    function _transferERC20(Asset memory _asset, address _from, uint256 _feeRate, address _feeCollector) private {
         uint256 originalValue = _asset.value;
-        uint256 fee = originalValue * feeRate / 1_000_000;
+        uint256 fee = originalValue * _feeRate / 1_000_000;
 
         SafeERC20.safeTransferFrom(IERC20(_asset.contractAddress), _from, _asset.beneficiary, originalValue - fee);
-        SafeERC20.safeTransferFrom(IERC20(_asset.contractAddress), _from, feeCollector, fee);
+        SafeERC20.safeTransferFrom(IERC20(_asset.contractAddress), _from, _feeCollector, fee);
     }
 
     function _transferERC721(Asset memory _asset, address _from) private {
@@ -71,6 +79,17 @@ contract DecentralandMarketplacePolygon is DecentralandMarketplacePolygonAssetTy
         itemIds[0] = _asset.value;
 
         collection.issueTokens(beneficiaries, itemIds);
+    }
+
+    function _transferERC20WithRoyalties(Asset memory _asset, address _from) private {
+        (address contractAddress, uint256 tokenId) = abi.decode(_asset.extra, (address, uint256));
+        address royaltiesReceiver = royaltiesManager.getRoyaltiesReceiver(contractAddress, tokenId);
+
+        if (royaltiesReceiver == address(0)) {
+            revert NoRoyaltiesReceiver();
+        }
+
+        _transferERC20(_asset, _from, royaltiesRate, royaltiesReceiver);
     }
 
     function _msgSender() internal view override returns (address) {

@@ -10,8 +10,8 @@ import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarket
 import {ICollection} from "src/marketplace/ICollection.sol";
 
 contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon {
-    constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate)
-        DecentralandMarketplacePolygon(_owner, _couponManager, _feeCollector, _feeRate)
+    constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate, address _royaltiesManager, uint256 _royaltiesRate)
+        DecentralandMarketplacePolygon(_owner, _couponManager, _feeCollector, _feeRate, _royaltiesManager, _royaltiesRate)
     {}
 
     function eip712Name() external view returns (string memory) {
@@ -58,7 +58,7 @@ abstract contract DecentralandMarketplaceTests is Test {
         signer = vm.createWallet("signer");
         metaTxSigner = vm.createWallet("metaTxSigner");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
-        marketplace = new DecentralandMarketplacePolygonHarness(owner, address(0), dao, 25_000);
+        marketplace = new DecentralandMarketplacePolygonHarness(owner, address(0), dao, 25_000, address(0), 25_000);
     }
 
     function signTrade(DecentralandMarketplacePolygonHarness.Trade memory _trade) internal view returns (bytes memory) {

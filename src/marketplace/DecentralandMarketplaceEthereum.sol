@@ -18,7 +18,7 @@ contract DecentralandMarketplaceEthereum is DecentralandMarketplaceEthereumAsset
 
     constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate)
         Ownable(_owner)
-        EIP712("DecentralandMarketplace", "1.0.0")
+        EIP712("DecentralandMarketplaceEthereum", "1.0.0")
         MarketplaceWithCouponManager(_couponManager)
     {
         feeCollector = _feeCollector;
