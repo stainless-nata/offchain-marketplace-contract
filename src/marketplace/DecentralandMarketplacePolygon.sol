@@ -12,32 +12,54 @@ import {ICollection} from "src/marketplace/ICollection.sol";
 import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCouponManager.sol";
 import {DecentralandMarketplacePolygonAssetTypes} from "src/marketplace/DecentralandMarketplacePolygonAssetTypes.sol";
 import {IRoyaltiesManager} from "src/marketplace/IRoyaltiesManager.sol";
+import {FeeCollector} from "src/marketplace/FeeCollector.sol";
 
-contract DecentralandMarketplacePolygon is DecentralandMarketplacePolygonAssetTypes, MarketplaceWithCouponManager, NativeMetaTransaction {
-    address public feeCollector;
-    uint256 public feeRate;
+contract DecentralandMarketplacePolygon is
+    DecentralandMarketplacePolygonAssetTypes,
+    MarketplaceWithCouponManager,
+    NativeMetaTransaction,
+    FeeCollector
+{
     IRoyaltiesManager public royaltiesManager;
     uint256 public royaltiesRate;
+
+    event RoyaltiesManagerUpdated(address indexed _caller, address indexed _royaltiesManager);
+    event RoyaltiesRateUpdated(address indexed _caller, uint256 _royaltiesRate);
 
     error NotCreator();
     error NoRoyaltiesReceiver();
 
     constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate, address _royaltiesManager, uint256 _royaltiesRate)
+        FeeCollector(_feeCollector, _feeRate)
         Ownable(_owner)
         EIP712("DecentralandMarketplacePolygon", "1.0.0")
         MarketplaceWithCouponManager(_couponManager)
     {
-        feeCollector = _feeCollector;
-        feeRate = _feeRate;
-        royaltiesManager = IRoyaltiesManager(_royaltiesManager);
-        royaltiesRate = _royaltiesRate;
+        _updateRoyaltiesManager(_royaltiesManager);
+        _updateRoyaltiesRate(_royaltiesRate);
+    }
+
+    function updateFeeCollector(address _feeCollector) external onlyOwner {
+        _updateFeeCollector(_msgSender(), _feeCollector);
+    }
+
+    function updateFeeRate(uint256 _feeRate) external onlyOwner {
+        _updateFeeRate(_msgSender(), _feeRate);
+    }
+
+    function updateRoyaltiesManager(address _royaltiesManager) external onlyOwner {
+        _updateRoyaltiesManager(_royaltiesManager);
+    }
+
+    function updateRoyaltiesRate(uint256 _royaltiesRate) external onlyOwner {
+        _updateRoyaltiesRate(_royaltiesRate);
     }
 
     function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal override {
         uint256 assetType = _asset.assetType;
 
         if (assetType == ASSET_TYPE_ERC20) {
-            _transferERC20(_asset, _from, feeRate, feeCollector);
+            _transferERC20WithCollectorFee(_asset, _from, feeCollector, feeRate);
         } else if (assetType == ASSET_TYPE_ERC721) {
             _transferERC721(_asset, _from);
         } else if (assetType == ASSET_TYPE_COLLECTION_ITEM) {
@@ -47,14 +69,6 @@ contract DecentralandMarketplacePolygon is DecentralandMarketplacePolygonAssetTy
         } else {
             revert UnsupportedAssetType(assetType);
         }
-    }
-
-    function _transferERC20(Asset memory _asset, address _from, uint256 _feeRate, address _feeCollector) private {
-        uint256 originalValue = _asset.value;
-        uint256 fee = originalValue * _feeRate / 1_000_000;
-
-        SafeERC20.safeTransferFrom(IERC20(_asset.contractAddress), _from, _asset.beneficiary, originalValue - fee);
-        SafeERC20.safeTransferFrom(IERC20(_asset.contractAddress), _from, _feeCollector, fee);
     }
 
     function _transferERC721(Asset memory _asset, address _from) private {
@@ -89,7 +103,19 @@ contract DecentralandMarketplacePolygon is DecentralandMarketplacePolygonAssetTy
             revert NoRoyaltiesReceiver();
         }
 
-        _transferERC20(_asset, _from, royaltiesRate, royaltiesReceiver);
+        _transferERC20WithCollectorFee(_asset, _from, royaltiesReceiver, royaltiesRate);
+    }
+
+    function _updateRoyaltiesManager(address _royaltiesManager) internal {
+        royaltiesManager = IRoyaltiesManager(_royaltiesManager);
+
+        emit RoyaltiesManagerUpdated(_msgSender(), _royaltiesManager);
+    }
+
+    function _updateRoyaltiesRate(uint256 _royaltiesRate) internal {
+        royaltiesRate = _royaltiesRate;
+
+        emit RoyaltiesRateUpdated(_msgSender(), _royaltiesRate);
     }
 
     function _msgSender() internal view override returns (address) {

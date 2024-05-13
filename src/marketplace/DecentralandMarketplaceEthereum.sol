@@ -9,40 +9,36 @@ import {EIP712} from "src/common/EIP712.sol";
 import {IComposable} from "src/marketplace/IComposable.sol";
 import {MarketplaceWithCouponManager} from "src/marketplace/MarketplaceWithCouponManager.sol";
 import {DecentralandMarketplaceEthereumAssetTypes} from "src/marketplace/DecentralandMarketplaceEthereumAssetTypes.sol";
+import {FeeCollector} from "src/marketplace/FeeCollector.sol";
 
-contract DecentralandMarketplaceEthereum is DecentralandMarketplaceEthereumAssetTypes, MarketplaceWithCouponManager {
-    address public feeCollector;
-    uint256 public feeRate;
-
+contract DecentralandMarketplaceEthereum is DecentralandMarketplaceEthereumAssetTypes, MarketplaceWithCouponManager, FeeCollector {
     error InvalidFingerprint();
 
     constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate)
+        FeeCollector(_feeCollector, _feeRate)
         Ownable(_owner)
         EIP712("DecentralandMarketplaceEthereum", "1.0.0")
         MarketplaceWithCouponManager(_couponManager)
-    {
-        feeCollector = _feeCollector;
-        feeRate = _feeRate;
+    {}
+
+    function updateFeeCollector(address _feeCollector) external onlyOwner {
+        _updateFeeCollector(_msgSender(), _feeCollector);
+    }
+
+    function updateFeeRate(uint256 _feeRate) external onlyOwner {
+        _updateFeeRate(_msgSender(), _feeRate);
     }
 
     function _transferAsset(Asset memory _asset, address _from, address, address) internal override {
         uint256 assetType = _asset.assetType;
 
         if (assetType == ASSET_TYPE_ERC20) {
-            _transferERC20(_asset, _from);
+            _transferERC20WithCollectorFee(_asset, _from, feeCollector, feeRate);
         } else if (assetType == ASSET_TYPE_ERC721) {
             _transferERC721(_asset, _from);
         } else {
             revert UnsupportedAssetType(assetType);
         }
-    }
-
-    function _transferERC20(Asset memory _asset, address _from) private {
-        uint256 originalValue = _asset.value;
-        uint256 fee = originalValue * feeRate / 1_000_000;
-
-        SafeERC20.safeTransferFrom(IERC20(_asset.contractAddress), _from, _asset.beneficiary, originalValue - fee);
-        SafeERC20.safeTransferFrom(IERC20(_asset.contractAddress), _from, feeCollector, fee);
     }
 
     function _transferERC721(Asset memory _asset, address _from) private {
