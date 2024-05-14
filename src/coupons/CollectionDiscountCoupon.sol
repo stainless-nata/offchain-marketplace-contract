@@ -14,7 +14,8 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
     uint256 public constant DISCOUNT_TYPE_FLAT = 2;
 
     /// @notice Schema Discount.
-    /// @param rate The rate of the discount. Must be over 1 million instead of 100. For example, 10% would be 100_000.
+    /// @param discountType The type of discount to apply. DISCOUNT_TYPE_RATE for percentage discounts and DISCOUNT_TYPE_FLAT for fixed discounts.
+    /// @param discount The value used to apply the discount. If discountType is DISCOUNT_TYPE_RATE, this value should be a percentage (e.g. 500_000 for 50% off). If discountType is DISCOUNT_TYPE_FLAT, this value should be the fixed discount amount.
     /// @param root The Merkle root of all the Collections that this Coupon will be valid for.
     struct CollectionDiscountCouponData {
         uint256 discountType;
@@ -28,7 +29,7 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
         bytes32[][] proofs;
     }
 
-    error TradeSentAndProofsLengthMismatch();
+    error InvalidSentOrProofsLength();
     error InvalidProof(uint256 _index);
     error SignerIsNotTheCreator(uint256 _index);
     error InvalidDiscountType();
@@ -47,10 +48,11 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
         CollectionDiscountCouponData memory data = abi.decode(_coupon.data, (CollectionDiscountCouponData));
         CollectionDiscountCouponCallerData memory callerData = abi.decode(_coupon.callerData, (CollectionDiscountCouponCallerData));
 
-        if (_trade.sent.length != callerData.proofs.length) {
-            revert TradeSentAndProofsLengthMismatch();
+        if (_trade.sent.length == 0 ||_trade.sent.length != callerData.proofs.length) {
+            revert InvalidSentOrProofsLength();
         }
 
+        // For each collection item being traded, a proof in the same index will be used to validate that the collection of that item is valid for the discount.
         for (uint256 i = 0; i < _trade.sent.length; i++) {
             Asset memory asset = _trade.sent[i];
 
@@ -69,6 +71,9 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
             }
         }
 
+        // Every received asset must be an ERC20 token.
+        // The discount will be applied to each one of them.
+        // Keep in mind that if you provide a flat discount, the discount will be applied to each one.
         for (uint256 i = 0; i < _trade.received.length; i++) {
             if (_trade.received[i].assetType != ASSET_TYPE_ERC20) {
                 revert UnsupportedReceivedAssetType(i);

@@ -24,7 +24,7 @@ contract CollectionDiscountCouponTests is Test {
 }
 
 contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
-    error TradeSentAndProofsLengthMismatch();
+    error InvalidSentOrProofsLength();
     error InvalidProof(uint256 _index);
     error SignerIsNotTheCreator(uint256 _index);
     error InvalidDiscountType();
@@ -55,7 +55,7 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         collectionDiscountCoupon.applyCoupon(trade, coupon);
     }
 
-    function test_RevertsIfTradeSentAndProofsLengthMismatch() public {
+    function test_RevertsIfInvalidSentOrProofsLength() public {
         CollectionDiscountCouponHarness.CollectionDiscountCouponData memory collectionDiscountCouponData;
         CollectionDiscountCouponHarness.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
 
@@ -66,7 +66,7 @@ contract ApplyCollectionDiscountCouponTests is CollectionDiscountCouponTests {
         CollectionDiscountCouponHarness.Trade memory trade;
         trade.sent = new CollectionDiscountCouponHarness.Asset[](1);
 
-        vm.expectRevert(TradeSentAndProofsLengthMismatch.selector);
+        vm.expectRevert(InvalidSentOrProofsLength.selector);
         collectionDiscountCoupon.applyCoupon(trade, coupon);
     }
 
