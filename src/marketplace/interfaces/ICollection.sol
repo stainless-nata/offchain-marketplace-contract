@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 
+/// @notice Interface for the Collection contract.
 interface ICollection is IERC721 {
     function issueTokens(address[] calldata _beneficiaries, uint256[] calldata _itemIds) external;
 
