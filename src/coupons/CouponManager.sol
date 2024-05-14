@@ -9,8 +9,16 @@ import {ICoupon} from "src/coupons/interfaces/ICoupon.sol";
 import {CouponTypesHashing} from "src/coupons/CouponTypesHashing.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 
+/// @notice Contract that allows applying Coupons to Trades.
+/// It holds the logic to control which Coupons are allowed to be applied.
+/// It also manages the Coupon signatures and their uses. This is useful to be able to add or remove new Coupons while still using the same EIP712 domain.
 contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
+    /// @notice The address of the Marketplace that will be able to apply Coupons.
+    /// Only this address will be able to apply Coupons.
     address public marketplace;
+
+    /// @notice Mapping of the allowed Coupon contracts.
+    /// If a Coupon is not in this mapping, it will not be allowed to be applied.
     mapping(address => bool) public allowedCoupons;
 
     event MarketplaceUpdated(address indexed _caller, address indexed _marketplace);
@@ -21,6 +29,9 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
     error UnauthorizedCaller(address _caller);
     error CouponNotAllowed(address _coupon);
 
+    /// @param _marketplace The address of the Marketplace that will be able to apply Coupons.
+    /// @param _owner The owner of the contract.
+    /// @param _allowedCoupons The initial list of allowed Coupons.
     constructor(address _marketplace, address _owner, address[] memory _allowedCoupons) EIP712("CouponManager", "1.0.0") Ownable(_owner) {
         _updateMarketplace(_marketplace);
 
@@ -29,10 +40,12 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         }
     }
 
+    /// @notice Updates the address of the Marketplace that will be able to apply Coupons.
     function updateMarketplace(address _marketplace) external onlyOwner {
         _updateMarketplace(_marketplace);
     }
 
+    /// @notice Updates the list of allowed Coupons.
     function updateAllowedCoupons(address[] memory _coupons, bool[] memory _values) external onlyOwner {
         if (_coupons.length != _values.length) {
             revert LengthMissmatch();
@@ -43,6 +56,8 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         }
     }
 
+    /// @notice Allows a user to cancel a signature.
+    /// The caller must be the signer of the Coupon signature.
     function cancelSignature(Coupon[] calldata _coupons) external {
         address caller = _msgSender();
 
@@ -55,15 +70,21 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         }
     }
 
+    /// @notice Applies a Coupon to a Trade.
+    /// @param _trade The Trade to apply the Coupon to.
+    /// @param _coupon The Coupon to apply.
+    /// @return - The Trade with the Coupon applied.
     function applyCoupon(Trade calldata _trade, Coupon calldata _coupon) external virtual returns (Trade memory) {
         address caller = _msgSender();
 
+        // Only the marketplace is allowed to apply Coupons.
         if (caller != marketplace) {
             revert UnauthorizedCaller(caller);
         }
 
         address couponAddress = _coupon.couponAddress;
 
+        // Fails if the coupon has not been allowed.
         if (!allowedCoupons[couponAddress]) {
             revert CouponNotAllowed(couponAddress);
         }
@@ -73,13 +94,17 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
         uint256 currentSignatureUses = signatureUses[hashedCouponSignature];
         address signer = _trade.signer;
 
+        // Verify that the check values provided in the Coupon are correct.
         _verifyChecks(_coupon.checks, hashedCouponSignature, currentSignatureUses, signer, caller);
+        // Verifiy that the Coupon signature is valid.
         _verifyCouponSignature(_coupon, signer);
 
         emit CouponApplied(caller, hashedTradeSignature, hashedCouponSignature);
 
+        // Increase the amount of uses of the Coupon signature.
         signatureUses[hashedCouponSignature]++;
 
+        // Apply the Coupon and return the modified Trade.
         return ICoupon(couponAddress).applyCoupon(_trade, _coupon);
     }
 
