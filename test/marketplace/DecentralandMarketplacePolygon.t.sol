@@ -690,3 +690,206 @@ contract UpdateRoyaltiesRateTests is DecentralandMarketplacePolygonTests {
         assertEq(marketplace.royaltiesRate(), 100);
     }
 }
+
+contract ExampleTests is DecentralandMarketplacePolygonTests {
+    IERC20 erc20;
+    uint256 erc20Sent;
+    address erc20OriginalHolder;
+
+    IERC721 collectionErc721;
+    uint256 collectionErc721TokenId;
+    address collectionErc721OriginalHolder;
+
+    ICollection collection;
+    uint256 collectionItemId;
+    address collectionItemOriginalCreator;
+
+    IERC721 erc721;
+    uint256 erc721TokenId;
+    address erc721OriginalHolder;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    function setUp() public override {
+        super.setUp();
+
+        erc20 = IERC20(0xA1c57f48F0Deb89f569dFbE6E2B7f46D33606fD4);
+        erc20Sent = 100 ether;
+        erc20OriginalHolder = 0x673e6B75a58354919FF5db539AA426727B385D17;
+
+        collectionErc721 = IERC721(0xDed1e53D7A43aC1844b66c0Ca0F02627EB42e16d);
+        collectionErc721TokenId = 1053122916685571866979180276836704323188950954005491112543109775497;
+        collectionErc721OriginalHolder = 0xc1325a7Cb84b41626eDCC97f5a124B592976cd5d;
+
+        collection = ICollection(0xDed1e53D7A43aC1844b66c0Ca0F02627EB42e16d);
+        collectionItemId = 10;
+        collectionItemOriginalCreator = 0x3cf368FaeCdb4a4E542c0efD17850ae133688C2a;
+
+        erc721 = IERC721(0x67F4732266C7300cca593C814d46bee72e40659F);
+        erc721TokenId = 597997;
+        erc721OriginalHolder = 0x5d01fb10c7C68c53c391F3C1e435FeA4D1E14434;
+    }
+
+    function test_TradeERC721ForERC20_ERC721IsCollectionNFT_RoyaltyGoesToCreator() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
+        vm.prank(collectionErc721OriginalHolder);
+        collectionErc721.transferFrom(collectionErc721OriginalHolder, signer.addr, collectionErc721TokenId);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), erc20Sent);
+
+        vm.prank(signer.addr);
+        collectionErc721.setApprovalForAll(address(marketplace), true);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
+        sent[0].contractAddress = address(collectionErc721);
+        sent[0].value = collectionErc721TokenId;
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        received[0].assetType = marketplace.ASSET_TYPE_ERC20();
+        received[0].contractAddress = address(erc20);
+        received[0].value = erc20Sent;
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        assertEq(collectionErc721.ownerOf(collectionErc721TokenId), signer.addr);
+        uint256 collectionItemOriginalCreatorBalance = erc20.balanceOf(collectionItemOriginalCreator);
+        uint256 signerBalance = erc20.balanceOf(signer.addr);
+
+        vm.prank(other);
+        // TODO: Find a way to expect events with the same name but different arguments
+        // vm.expectEmit(address(collectionErc721));
+        // emit Transfer(signer.addr, other, collectionErc721TokenId);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, collectionItemOriginalCreator, 2.5 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 97.5 ether);
+        marketplace.accept(trades);
+
+        assertEq(collectionErc721.ownerOf(collectionErc721TokenId), other);
+        assertEq(erc20.balanceOf(collectionItemOriginalCreator), collectionItemOriginalCreatorBalance + 2.5 ether);
+        assertEq(erc20.balanceOf(signer.addr), signerBalance + 97.5 ether);
+    }
+
+    function test_TradeERC721ForERC20_ERC721IsNotCollectionNFT_FeeGoesToCollector() public {
+
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
+        vm.prank(erc721OriginalHolder);
+        erc721.transferFrom(erc721OriginalHolder, signer.addr, erc721TokenId);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), erc20Sent);
+
+        vm.prank(signer.addr);
+        erc721.setApprovalForAll(address(marketplace), true);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
+        sent[0].contractAddress = address(erc721);
+        sent[0].value = erc721TokenId;
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        received[0].assetType = marketplace.ASSET_TYPE_ERC20();
+        received[0].contractAddress = address(erc20);
+        received[0].value = erc20Sent;
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        assertEq(erc721.ownerOf(erc721TokenId), signer.addr);
+        uint256 daoBalance = erc20.balanceOf(dao);
+        uint256 signerBalance = erc20.balanceOf(signer.addr);
+
+        vm.prank(other);
+        // TODO: Find a way to expect events with the same name but different arguments
+        // vm.expectEmit(address(erc721));
+        // emit Transfer(signer.addr, other, erc721TokenId);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 2.5 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 97.5 ether);
+        marketplace.accept(trades);
+
+        assertEq(erc721.ownerOf(erc721TokenId), other);
+        assertEq(erc20.balanceOf(dao), daoBalance + 2.5 ether);
+        assertEq(erc20.balanceOf(signer.addr), signerBalance + 97.5 ether);
+    }
+
+    function test_Trade2ERC721ForERC20_OneIsCollectionNFT_TheOtherIsNot_FeesAndRoyaltiesArePaid() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
+        vm.prank(collectionErc721OriginalHolder);
+        collectionErc721.transferFrom(collectionErc721OriginalHolder, signer.addr, collectionErc721TokenId);
+
+        vm.prank(erc721OriginalHolder);
+        erc721.transferFrom(erc721OriginalHolder, signer.addr, erc721TokenId);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), erc20Sent);
+
+        vm.prank(signer.addr);
+        collectionErc721.setApprovalForAll(address(marketplace), true);
+
+        vm.prank(signer.addr);
+        erc721.setApprovalForAll(address(marketplace), true);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](2);
+        sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
+        sent[0].contractAddress = address(collectionErc721);
+        sent[0].value = collectionErc721TokenId;
+        sent[1].assetType = marketplace.ASSET_TYPE_ERC721();
+        sent[1].contractAddress = address(erc721);
+        sent[1].value = erc721TokenId;
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        received[0].assetType = marketplace.ASSET_TYPE_ERC20();
+        received[0].contractAddress = address(erc20);
+        received[0].value = erc20Sent;
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        assertEq(collectionErc721.ownerOf(collectionErc721TokenId), signer.addr);
+        assertEq(erc721.ownerOf(erc721TokenId), signer.addr);
+        uint256 collectionItemOriginalCreatorBalance = erc20.balanceOf(collectionItemOriginalCreator);
+        uint256 daoBalance = erc20.balanceOf(dao);
+        uint256 signerBalance = erc20.balanceOf(signer.addr);
+
+        vm.prank(other);
+        // TODO: Find a way to expect events with the same name but different arguments
+        // vm.expectEmit(address(erc721));
+        // emit Transfer(signer.addr, other, erc721TokenId);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 2.5 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, collectionItemOriginalCreator, 2.5 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 95 ether);
+        marketplace.accept(trades);
+
+        assertEq(collectionErc721.ownerOf(collectionErc721TokenId), other);
+        assertEq(erc721.ownerOf(erc721TokenId), other);
+        assertEq(erc20.balanceOf(dao), daoBalance + 2.5 ether);
+        assertEq(erc20.balanceOf(collectionItemOriginalCreator), collectionItemOriginalCreatorBalance + 2.5 ether);
+        assertEq(erc20.balanceOf(signer.addr), signerBalance + 95 ether);
+    }
+}
