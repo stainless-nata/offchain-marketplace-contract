@@ -40,7 +40,7 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
     }
 }
 
-abstract contract DecentralandMarketplaceTests is Test {
+abstract contract DecentralandMarketplacePolygonTests is Test {
     address owner;
     address dao;
     address royaltiesManager;
@@ -50,6 +50,8 @@ abstract contract DecentralandMarketplaceTests is Test {
     DecentralandMarketplacePolygonHarness marketplace;
 
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
+
+    error OwnableUnauthorizedAccount(address account);
 
     function setUp() public virtual {
         uint256 forkId = vm.createFork("https://rpc.decentraland.org/polygon", 56395304); // Apr-29-2024 07:23:50 PM +UTC
@@ -81,7 +83,7 @@ abstract contract DecentralandMarketplaceTests is Test {
     }
 }
 
-contract UnsupportedAssetTypeTests is DecentralandMarketplaceTests {
+contract UnsupportedAssetTypeTests is DecentralandMarketplacePolygonTests {
     error UnsupportedAssetType(uint256 _assetType);
 
     function test_RevertsIfAssetTypeIsInvalid() public {
@@ -98,7 +100,7 @@ contract UnsupportedAssetTypeTests is DecentralandMarketplaceTests {
     }
 }
 
-contract TransferERC20Tests is DecentralandMarketplaceTests {
+contract TransferERC20Tests is DecentralandMarketplacePolygonTests {
     IERC20 erc20;
     uint256 erc20Sent;
     address erc20OriginalHolder;
@@ -215,7 +217,7 @@ contract TransferERC20Tests is DecentralandMarketplaceTests {
     }
 }
 
-contract TransferERC721Tests is DecentralandMarketplaceTests {
+contract TransferERC721Tests is DecentralandMarketplacePolygonTests {
     IERC721 erc721;
     uint256 erc721TokenId;
     address erc721OriginalHolder;
@@ -328,7 +330,7 @@ contract TransferERC721Tests is DecentralandMarketplaceTests {
     }
 }
 
-contract TransferCollectionItemTests is DecentralandMarketplaceTests {
+contract TransferCollectionItemTests is DecentralandMarketplacePolygonTests {
     ICollection collection;
     uint256 collectionItemId;
     address collectionItemOriginalCreator;
@@ -509,7 +511,7 @@ contract TransferCollectionItemTests is DecentralandMarketplaceTests {
     }
 }
 
-contract ExecuteMetaTransactionTests is DecentralandMarketplaceTests {
+contract ExecuteMetaTransactionTests is DecentralandMarketplacePolygonTests {
     error Expired();
     error MetaTransactionFailedWithoutReason();
 
@@ -600,10 +602,8 @@ contract ExecuteMetaTransactionTests is DecentralandMarketplaceTests {
     }
 }
 
-contract UpdateCouponsTests is DecentralandMarketplaceTests {
+contract UpdateCouponsTests is DecentralandMarketplacePolygonTests {
     event CouponManagerUpdated(address indexed _caller, address indexed _couponManager);
-
-    error OwnableUnauthorizedAccount(address _account);
 
     function test_RevertsIfNotOwner() public {
         vm.prank(other);
@@ -616,5 +616,41 @@ contract UpdateCouponsTests is DecentralandMarketplaceTests {
         vm.expectEmit(address(marketplace));
         emit CouponManagerUpdated(owner, other);
         marketplace.updateCouponManager(other);
+    }
+}
+
+contract UpdateFeeCollectorTests is DecentralandMarketplacePolygonTests {
+    event FeeCollectorUpdated(address indexed _caller, address indexed _feeCollector);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateFeeCollector(dao);
+    }
+
+    function test_UpdatesFeeCollector() public {
+        vm.prank(owner);
+        vm.expectEmit(address(marketplace));
+        emit FeeCollectorUpdated(owner, dao);
+        marketplace.updateFeeCollector(dao);
+        assertEq(marketplace.feeCollector(), dao);
+    }
+}
+
+contract UpdateFeeRateTests is DecentralandMarketplacePolygonTests {
+    event FeeRateUpdated(address indexed _caller, uint256 _feeRate);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateFeeRate(100);
+    }
+
+    function test_UpdatesFeeRate() public {
+        vm.prank(owner);
+        vm.expectEmit(address(marketplace));
+        emit FeeRateUpdated(owner, 100);
+        marketplace.updateFeeRate(100);
+        assertEq(marketplace.feeRate(), 100);
     }
 }
