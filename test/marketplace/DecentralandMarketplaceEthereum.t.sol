@@ -33,6 +33,8 @@ abstract contract DecentralandMarketplaceEthereumTests is Test {
     address dao;
     DecentralandMarketplaceEthereumHarness marketplace;
 
+    error OwnableUnauthorizedAccount(address account);
+
     function setUp() public virtual {
         uint256 forkId = vm.createFork("https://rpc.decentraland.org/mainnet", 19755898); // Apr-28-2024 07:27:59 PM +UTC
         vm.selectFork(forkId);
@@ -449,6 +451,42 @@ contract TransferComposableTokenTests is DecentralandMarketplaceEthereumTests {
         marketplace.accept(trades);
 
         assertEq(composable.ownerOf(composableTokenId), signer.addr);
+    }
+}
+
+contract UpdateFeeCollectorTests is DecentralandMarketplaceEthereumTests {
+    event FeeCollectorUpdated(address indexed _caller, address indexed _feeCollector);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateFeeCollector(dao);
+    }
+
+    function test_UpdatesFeeCollector() public {
+        vm.prank(dao);
+        vm.expectEmit(address(marketplace));
+        emit FeeCollectorUpdated(dao, other);
+        marketplace.updateFeeCollector(other);
+        assertEq(marketplace.feeCollector(), other);
+    }
+}
+
+contract UpdateFeeRateTests is DecentralandMarketplaceEthereumTests {
+    event FeeRateUpdated(address indexed _caller, uint256 _feeRate);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateFeeRate(100);
+    }
+
+    function test_UpdatesFeeRate() public {
+        vm.prank(dao);
+        vm.expectEmit(address(marketplace));
+        emit FeeRateUpdated(dao, 100);
+        marketplace.updateFeeRate(100);
+        assertEq(marketplace.feeRate(), 100);
     }
 }
 
