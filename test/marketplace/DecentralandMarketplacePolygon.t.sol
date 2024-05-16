@@ -654,3 +654,39 @@ contract UpdateFeeRateTests is DecentralandMarketplacePolygonTests {
         assertEq(marketplace.feeRate(), 100);
     }
 }
+
+contract UpdateRoyaltiesManagerTests is DecentralandMarketplacePolygonTests {
+    event RoyaltiesManagerUpdated(address indexed _caller, address indexed _royaltiesManager);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateRoyaltiesManager(dao);
+    }
+
+    function test_UpdatesFeeCollector() public {
+        vm.prank(owner);
+        vm.expectEmit(address(marketplace));
+        emit RoyaltiesManagerUpdated(owner, dao);
+        marketplace.updateRoyaltiesManager(dao);
+        assertEq(address(marketplace.royaltiesManager()), dao);
+    }
+}
+
+contract UpdateRoyaltiesRateTests is DecentralandMarketplacePolygonTests {
+    event RoyaltiesRateUpdated(address indexed _caller, uint256 _royaltiesRate);
+
+    function test_RevertsIfCallerIsNotTheOwner() public {
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, other));
+        marketplace.updateRoyaltiesRate(100);
+    }
+
+    function test_UpdatesFeeRate() public {
+        vm.prank(owner);
+        vm.expectEmit(address(marketplace));
+        emit RoyaltiesRateUpdated(owner, 100);
+        marketplace.updateRoyaltiesRate(100);
+        assertEq(marketplace.royaltiesRate(), 100);
+    }
+}
