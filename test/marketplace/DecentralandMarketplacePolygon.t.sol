@@ -8,6 +8,8 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {DecentralandMarketplacePolygon} from "src/marketplace/DecentralandMarketplacePolygon.sol";
 import {ICollection} from "src/marketplace/interfaces/ICollection.sol";
+import {CouponManager} from "src/coupons/CouponManager.sol";
+import {CollectionDiscountCoupon} from "src/coupons/CollectionDiscountCoupon.sol";
 
 contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon {
     constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate, address _royaltiesManager, uint256 _royaltiesRate)
@@ -40,6 +42,14 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
     }
 }
 
+contract CouponManagerHarness is CouponManager {
+    constructor(address _marketplace, address _owner, address[] memory _allowedCoupons) CouponManager(_marketplace, _owner, _allowedCoupons) {}
+
+    function eip712CouponHash(Coupon memory _coupon) external view returns (bytes32) {
+        return _hashTypedDataV4(_hashCoupon(_coupon));
+    }
+}
+
 abstract contract DecentralandMarketplacePolygonTests is Test {
     address owner;
     address dao;
@@ -47,6 +57,8 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
     VmSafe.Wallet signer;
     VmSafe.Wallet metaTxSigner;
     address other;
+    CollectionDiscountCoupon collectionDiscountCoupon;
+    CouponManagerHarness couponManager;
     DecentralandMarketplacePolygonHarness marketplace;
 
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
@@ -62,7 +74,18 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
         signer = vm.createWallet("signer");
         metaTxSigner = vm.createWallet("metaTxSigner");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
-        marketplace = new DecentralandMarketplacePolygonHarness(owner, address(0), dao, 25_000, royaltiesManager, 25_000);
+
+        collectionDiscountCoupon = new CollectionDiscountCoupon();
+
+        address[] memory allowedCoupons = new address[](1);
+        allowedCoupons[0] = address(collectionDiscountCoupon);
+
+        couponManager = new CouponManagerHarness(address(0), owner, allowedCoupons);
+
+        marketplace = new DecentralandMarketplacePolygonHarness(owner, address(couponManager), dao, 25_000, royaltiesManager, 25_000);
+
+        vm.prank(owner);
+        couponManager.updateMarketplace(address(marketplace));
     }
 
     function signTrade(DecentralandMarketplacePolygonHarness.Trade memory _trade) internal view returns (bytes memory) {
@@ -72,6 +95,11 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
 
     function signMetaTx(DecentralandMarketplacePolygonHarness.MetaTransaction memory _metaTx) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(metaTxSigner.privateKey, marketplace.eip712MetaTransactionHash(_metaTx));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function signCoupon(CouponManagerHarness.Coupon memory _coupon) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer.privateKey, couponManager.eip712CouponHash(_coupon));
         return abi.encodePacked(r, s, v);
     }
 
@@ -780,7 +808,6 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
     }
 
     function test_TradeERC721ForERC20_ERC721IsNotCollectionNFT_FeeGoesToCollector() public {
-
         vm.prank(erc20OriginalHolder);
         erc20.transfer(other, erc20Sent);
 
@@ -891,5 +918,76 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         assertEq(erc20.balanceOf(dao), daoBalance + 2.5 ether);
         assertEq(erc20.balanceOf(collectionItemOriginalCreator), collectionItemOriginalCreatorBalance + 2.5 ether);
         assertEq(erc20.balanceOf(signer.addr), signerBalance + 95 ether);
+    }
+
+    function test_TradeERC721ForERC20_ERC721IsCollectionNFT_ApplyCollectionDiscountCoupon() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
+        vm.prank(collectionItemOriginalCreator);
+        collection.transferCreatorship(signer.addr);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), erc20Sent);
+
+        vm.prank(signer.addr);
+        address[] memory setMintersMinters = new address[](1);
+        setMintersMinters[0] = address(marketplace);
+        bool[] memory setMintersValues = new bool[](1);
+        setMintersValues[0] = true;
+        collection.setMinters(setMintersMinters, setMintersValues);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_COLLECTION_ITEM();
+        sent[0].contractAddress = address(collection);
+        sent[0].value = collectionItemId;
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        received[0].assetType = marketplace.ASSET_TYPE_ERC20();
+        received[0].contractAddress = address(erc20);
+        received[0].value = erc20Sent;
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        CollectionDiscountCoupon.CollectionDiscountCouponData memory collectionDiscountCouponData;
+        collectionDiscountCouponData.discount = 500_000;
+        collectionDiscountCouponData.discountType = collectionDiscountCoupon.DISCOUNT_TYPE_RATE();
+        collectionDiscountCouponData.root = 0x68ad9c0c778776109596c0568ba9c69ca861338e902dfb8aa5be05be190c65ae;
+
+        CollectionDiscountCoupon.CollectionDiscountCouponCallerData memory collectionDiscountCouponCallerData;
+        collectionDiscountCouponCallerData.proofs = new bytes32[][](1);
+        collectionDiscountCouponCallerData.proofs[0] = new bytes32[](3);
+        collectionDiscountCouponCallerData.proofs[0][0] = 0x161691c7185a37ff918e70bebef716ddd87844ac47f419ea23eaf4fe983fbf2c;
+        collectionDiscountCouponCallerData.proofs[0][1] = 0xf1bd988d50408c15a0d017a73ff63ab5c30cc78771b609d99142fa4052c02baa;
+        collectionDiscountCouponCallerData.proofs[0][2] = 0xd50d464af1a64cdd6868c42456bc58cfc561fac83e19d742b6397ae5eb44660f;
+
+        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](1);
+        coupons[0].checks.expiration = block.timestamp;
+        coupons[0].couponAddress = address(collectionDiscountCoupon);
+        coupons[0].data = abi.encode(collectionDiscountCouponData);
+        coupons[0].callerData = abi.encode(collectionDiscountCouponCallerData);
+        coupons[0].signature = signCoupon(coupons[0]);
+
+        uint256 daoBalance = erc20.balanceOf(dao);
+        uint256 signerBalance = erc20.balanceOf(signer.addr);
+
+        vm.prank(other);
+        // // TODO: Find a way to expect events with the same name but different arguments
+        // // vm.expectEmit(address(collectionErc721));
+        // // emit Transfer(signer.addr, other, collectionErc721TokenId);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, dao, 1.25 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 48.75 ether);
+        marketplace.acceptWithCoupon(trades, coupons);
+
+        assertEq(collection.ownerOf(1053122916685571866979180276836704323188950954005491112543109775772), other);
+        assertEq(erc20.balanceOf(dao), daoBalance + 1.25 ether);
+        assertEq(erc20.balanceOf(signer.addr), signerBalance + 48.75 ether);
     }
 }
