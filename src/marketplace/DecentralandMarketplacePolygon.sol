@@ -76,33 +76,43 @@ contract DecentralandMarketplacePolygon is
     /// @dev Overriden Marketplace function which modifies the Trade before being accepted.
     /// In this case, the Trade is modified to handle fees and royalties.
     function _modifyTrade(Trade memory _trade) internal view override returns (Trade memory) {
-        // The total amount of assets being traded.
-        uint256 assetsLength = _trade.sent.length + _trade.received.length;
-        // Tracks if the fee collector should be paid its fee in this Trade.
-        bool payFeeCollector = false;
-        // The amount of royalty beneficiaries this Trade will have.
-        uint256 royaltyBeneficiariesCount = 0;
-        // The addresses that will be paid royalties.
-        // Given that memory arrays cannot be dynamic, we need to allocate the maximum possible length.
-        address[] memory royaltyBeneficiaries = new address[](assetsLength);
+        uint256 sentLength = _trade.sent.length;
+        uint256 receivedLength = _trade.received.length;
 
-        // Updates the values with the sent assets.
+        // Tracks if the fee collector should be paid.
+        bool payFeeCollector = false;
+        // Tracks the number of addresses that have to be paid royalties.
+        uint256 royaltyBeneficiariesCount = 0;
+        // Tracks the addresses that have to be paid royalties.
+        address[] memory royaltyBeneficiaries = new address[](sentLength + receivedLength);
+
+        // Update the previous values depending on the sent assets.
         (payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries) =
             _getFeesData(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.sent);
 
-        // Updates the values with the received assets.
+        // Update the previous values depending on the received assets.
         (payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries) =
             _getFeesData(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.received);
 
-        // Encodes the fees data so it can be added to erc20 assets.
-        bytes memory encodedFeeData = abi.encode(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries);
+        // Encodes the fees and royalties data to be stored in the assets.
+        bytes memory endocodedFeeAndRoyaltyData = abi.encode(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries);
 
-        // Updates the sent erc20 assets to include the fees data.
-        _trade.sent = _updateERC20s(_trade.sent, encodedFeeData);
-        // Updates the received erc20 assets to include the fees data.
-        _trade.received = _updateERC20s(_trade.received, encodedFeeData);
+        // Modify the sent assets to include the fees and royalties.
+        for (uint256 i = 0; i < sentLength; i++) {
+            if (_trade.sent[i].assetType == ASSET_TYPE_ERC20) {
+                _trade.sent[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
+                _trade.sent[i].extra = endocodedFeeAndRoyaltyData;
+            }
+        }
 
-        // Returns the Trade with the modified assets to include fees and royalties.
+        // Modify the received assets to include the fees and royalties.
+        for (uint256 i = 0; i < receivedLength; i++) {
+            if (_trade.received[i].assetType == ASSET_TYPE_ERC20) {
+                _trade.received[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
+                _trade.received[i].extra = endocodedFeeAndRoyaltyData;
+            }
+        }
+
         return _trade;
     }
 
@@ -115,27 +125,24 @@ contract DecentralandMarketplacePolygon is
         returns (bool, uint256, address[] memory)
     {
         for (uint256 i = 0; i < _assets.length; i++) {
-            Asset memory asset = _assets[i];
-
-            if (asset.assetType == ASSET_TYPE_ERC721) {
+            if (_assets[i].assetType == ASSET_TYPE_ERC721) {
                 // The returned value can be one of the following:
                 // - The beneficiary of the corresponding collection item of the asset.
                 // - The creator of the collection the asset belongs to. In case the beneficiary in the previous case is 0.
                 // - The 0 address. Indicating that the asset is not a collection nft.
-                address royaltyBeneficiary = royaltiesManager.getRoyaltiesReceiver(asset.contractAddress, asset.value);
+                address royaltyBeneficiary = royaltiesManager.getRoyaltiesReceiver(_assets[i].contractAddress, _assets[i].value);
 
                 // Track the royalties receiver for collection nfts.
                 if (royaltyBeneficiary != address(0)) {
-                    _royaltyBeneficiaries[_royaltyBeneficiariesCount] = royaltyBeneficiary;
-                    _royaltyBeneficiariesCount++;
+                    _royaltyBeneficiaries[_royaltyBeneficiariesCount++] = royaltyBeneficiary;
                 } else {
                     // Use the fee collector as the beneficiary for non collection nfts asset.
                     _payFeeCollector = true;
                 }
-            } else if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM) {
+            } else if (_assets[i].assetType == ASSET_TYPE_COLLECTION_ITEM) {
                 // Collection items that are going to be minted will pay fees to the fee collector.
                 _payFeeCollector = true;
-            } else if (asset.assetType == ASSET_TYPE_ERC20_WITH_FEES) {
+            } else if (_assets[i].assetType == ASSET_TYPE_ERC20_WITH_FEES) {
                 // The ASSET_TYPE_ERC20_WITH_FEES can only be used programmatically and set by this contract.
                 // Trades should not be signed with this kind of asset type, otherwise it will revert.
                 revert("ASSET_TYPE_ERC20_WITH_FEES not allowed");
@@ -143,18 +150,6 @@ contract DecentralandMarketplacePolygon is
         }
 
         return (_payFeeCollector, _royaltyBeneficiariesCount, _royaltyBeneficiaries);
-    }
-
-    /// @dev Updates ERC20 assets to include the fees data.
-    function _updateERC20s(Asset[] memory _assets, bytes memory _encodedFeeData) private pure returns (Asset[] memory) {
-        for (uint256 i = 0; i < _assets.length; i++) {
-            if (_assets[i].assetType == ASSET_TYPE_ERC20) {
-                _assets[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
-                _assets[i].extra = _encodedFeeData;
-            }
-        }
-
-        return _assets;
     }
 
     /// @dev Overriden Marketplace function to transfer assets.
