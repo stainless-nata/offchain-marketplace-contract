@@ -63,6 +63,7 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
 
     event MetaTransactionExecuted(address indexed _userAddress, address indexed _relayerAddress, bytes _functionData);
 
+    error UnsupportedAssetType(uint256 _assetType);
     error OwnableUnauthorizedAccount(address account);
 
     function setUp() public virtual {
@@ -112,8 +113,6 @@ abstract contract DecentralandMarketplacePolygonTests is Test {
 }
 
 contract UnsupportedAssetTypeTests is DecentralandMarketplacePolygonTests {
-    error UnsupportedAssetType(uint256 _assetType);
-
     function test_RevertsIfAssetTypeIsInvalid() public {
         uint256 invalidAssetType = 100;
 
@@ -989,5 +988,75 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         assertEq(collection.ownerOf(1053122916685571866979180276836704323188950954005491112543109775772), other);
         assertEq(erc20.balanceOf(dao), daoBalance + 1.25 ether);
         assertEq(erc20.balanceOf(signer.addr), signerBalance + 48.75 ether);
+    }
+
+    function test_RevertsIfReceivedAssetTypeIsErc20WithFees() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
+        vm.prank(collectionErc721OriginalHolder);
+        collectionErc721.transferFrom(collectionErc721OriginalHolder, signer.addr, collectionErc721TokenId);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), erc20Sent);
+
+        vm.prank(signer.addr);
+        collectionErc721.setApprovalForAll(address(marketplace), true);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_ERC721();
+        sent[0].contractAddress = address(collectionErc721);
+        sent[0].value = collectionErc721TokenId;
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        received[0].assetType = marketplace.ASSET_TYPE_ERC20_WITH_FEES();
+        received[0].contractAddress = address(erc20);
+        received[0].value = erc20Sent;
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(UnsupportedAssetType.selector, marketplace.ASSET_TYPE_ERC20_WITH_FEES()));
+        marketplace.accept(trades);
+    }
+
+    function test_RevertsIfSentAssetTypeIsErc20WithFees() public {
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, erc20Sent);
+
+        vm.prank(collectionErc721OriginalHolder);
+        collectionErc721.transferFrom(collectionErc721OriginalHolder, signer.addr, collectionErc721TokenId);
+
+        vm.prank(other);
+        erc20.approve(address(marketplace), erc20Sent);
+
+        vm.prank(signer.addr);
+        collectionErc721.setApprovalForAll(address(marketplace), true);
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        sent[0].assetType = marketplace.ASSET_TYPE_ERC20_WITH_FEES();
+        sent[0].contractAddress = address(erc20);
+        sent[0].value = erc20Sent;
+
+        DecentralandMarketplacePolygonHarness.Asset[] memory received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        received[0].assetType = marketplace.ASSET_TYPE_ERC721();
+        received[0].contractAddress = address(collectionErc721);
+        received[0].value = collectionErc721TokenId;
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].sent = sent;
+        trades[0].received = received;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(other);
+        vm.expectRevert(abi.encodeWithSelector(UnsupportedAssetType.selector, marketplace.ASSET_TYPE_ERC20_WITH_FEES()));
+        marketplace.accept(trades);
     }
 }
