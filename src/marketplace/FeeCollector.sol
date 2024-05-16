@@ -29,14 +29,4 @@ abstract contract FeeCollector is MarketplaceTypes {
 
         emit FeeRateUpdated(_caller, _feeRate);
     }
-
-    function _transferERC20WithCollectorFee(Asset memory _asset, address _from, address _feeCollector, uint256 _feeRate) internal {
-        uint256 originalValue = _asset.value;
-        uint256 fee = originalValue * _feeRate / 1_000_000;
-
-        IERC20 erc20 = IERC20(_asset.contractAddress);
-
-        SafeERC20.safeTransferFrom(erc20, _from, _asset.beneficiary, originalValue - fee);
-        SafeERC20.safeTransferFrom(erc20, _from, _feeCollector, fee);
-    }
 }

@@ -8,20 +8,27 @@ import {Verifications} from "src/common/Verifications.sol";
 import {MarketplaceTypesHashing} from "src/marketplace/MarketplaceTypesHashing.sol";
 
 abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausable, ReentrancyGuard {
+    /// @notice Trade ids that have been already used.
+    /// Trade ids are composed by hashing:
+    /// Salt + Caller + Received Assets (Contract Address + Value)
     mapping(bytes32 => bool) public usedTradeIds;
 
     event Traded(address indexed _caller, bytes32 indexed _signature);
 
     error UsedTradeId();
 
+    /// @notice Pauses the contract so no new trades can be accepted.
     function pause() external onlyOwner {
         _pause();
     }
 
+    /// @notice Unpauses the contract to resume normal operations.
     function unpause() external onlyOwner {
         _unpause();
     }
 
+    /// @notice Revokes a signature so it cannot be used anymore.
+    /// The caller must be the signer of the signature.
     function cancelSignature(Trade[] calldata _trades) external {
         address caller = _msgSender();
 
@@ -29,11 +36,11 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
             Trade memory trade = _trades[i];
 
             _verifyTradeSignature(trade, caller);
-            
             _cancelSignature(keccak256(trade.signature));
         }
     }
 
+    /// @notice Accepts a Trade.
     function accept(Trade[] calldata _trades) external whenNotPaused nonReentrant {
         address caller = _msgSender();
 
@@ -43,16 +50,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         }
     }
 
-    function _accept(Trade memory _trade, address _caller) internal {
-        bytes32 hashedSignature = keccak256(_trade.signature);
-        address signer = _trade.signer;
-
-        emit Traded(_caller, hashedSignature);
-
-        _transferAssets(_trade.sent, signer, _caller, signer, _caller);
-        _transferAssets(_trade.received, _caller, signer, signer, _caller);
-    }
-
+    /// @notice Returns the trade id for a given Trade.
     function getTradeId(Trade memory _trade, address _caller) public pure returns (bytes32) {
         bytes32 tradeId = keccak256(abi.encodePacked(_trade.checks.salt, _caller));
 
@@ -65,6 +63,21 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         return tradeId;
     }
 
+    /// @dev Accepts a Trade.
+    /// This function is internal to allow child contracts to using in their own accept function.
+    function _accept(Trade memory _trade, address _caller) internal {
+        Trade memory modifiedTrade = _modifyTrade(_trade);
+
+        bytes32 hashedSignature = keccak256(modifiedTrade.signature);
+        address signer = modifiedTrade.signer;
+
+        emit Traded(_caller, hashedSignature);
+
+        _transferAssets(modifiedTrade.sent, signer, _caller, signer, _caller);
+        _transferAssets(modifiedTrade.received, _caller, signer, signer, _caller);
+    }
+
+    /// @dev Verifies that the Trade passes all checks and the signature is valid.
     function _verifyTrade(Trade memory _trade, address _caller) internal {
         bytes32 hashedSignature = keccak256(_trade.signature);
         address signer = _trade.signer;
@@ -85,10 +98,13 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         signatureUses[hashedSignature]++;
     }
 
+    /// @dev Verifies that the Trade signature is valid.
     function _verifyTradeSignature(Trade memory _trade, address _signer) private view {
         _verifySignature(_hashTrade(_trade), _trade.signature, _signer);
     }
 
+    /// @dev Transfers all the provided assets using the overriden _transferAsset function.
+    /// Updates all the asset beneficiaries to the provided _to address in case the original beneficiary is the 0 address.
     function _transferAssets(Asset[] memory _assets, address _from, address _to, address _signer, address _caller) private {
         for (uint256 i = 0; i < _assets.length; i++) {
             Asset memory asset = _assets[i];
@@ -101,6 +117,14 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         }
     }
 
+    /// @dev Allows the child contract to update the Trade before accepting it.
+    function _modifyTrade(Trade memory _trade) internal view virtual returns (Trade memory) {
+        // Override
+
+        return _trade;
+    }
+
+    /// @dev Allows the child contract to handle the transfer of assets.
     function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal virtual {
         // Override
     }

@@ -44,13 +44,24 @@ contract DecentralandMarketplaceEthereum is DecentralandMarketplaceEthereumAsset
         uint256 assetType = _asset.assetType;
 
         if (assetType == ASSET_TYPE_ERC20) {
-            // All erc20 transfers will include the fee being sent to the feeCollector.
-            _transferERC20WithCollectorFee(_asset, _from, feeCollector, feeRate);
+            _transferERC20(_asset, _from);
         } else if (assetType == ASSET_TYPE_ERC721) {
             _transferERC721(_asset, _from);
         } else {
             revert UnsupportedAssetType(assetType);
         }
+    }
+
+    /// @dev Transfers ERC20 assets to the beneficiary.
+    /// A part of the value is taken as a fee and transfered to the fee collector.
+    function _transferERC20(Asset memory _asset, address _from) internal {
+        uint256 originalValue = _asset.value;
+        uint256 fee = originalValue * feeRate / 1_000_000;
+
+        IERC20 erc20 = IERC20(_asset.contractAddress);
+
+        SafeERC20.safeTransferFrom(erc20, _from, _asset.beneficiary, originalValue - fee);
+        SafeERC20.safeTransferFrom(erc20, _from, feeCollector, fee);
     }
 
     /// @dev Transfers ERC721 assets to the beneficiary.

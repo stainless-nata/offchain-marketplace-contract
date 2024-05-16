@@ -73,22 +73,133 @@ contract DecentralandMarketplacePolygon is
         _updateRoyaltiesRate(_royaltiesRate);
     }
 
+    /// @dev Overriden Marketplace function which modifies the Trade before being accepted.
+    /// In this case, the Trade is modified to handle fees and royalties.
+    function _modifyTrade(Trade memory _trade) internal view override returns (Trade memory) {
+        // The total amount of assets being traded.
+        uint256 assetsLength = _trade.sent.length + _trade.received.length;
+        // Tracks if the fee collector should be paid its fee in this Trade.
+        bool payFeeCollector = false;
+        // The amount of royalty beneficiaries this Trade will have.
+        uint256 royaltyBeneficiariesCount = 0;
+        // The addresses that will be paid royalties.
+        // Given that memory arrays cannot be dynamic, we need to allocate the maximum possible length.
+        address[] memory royaltyBeneficiaries = new address[](assetsLength);
+
+        // Updates the values with the sent assets.
+        (payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries) =
+            _getFeesData(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.sent);
+
+        // Updates the values with the received assets.
+        (payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries) =
+            _getFeesData(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.received);
+
+        // Encodes the fees data so it can be added to erc20 assets.
+        bytes memory encodedFeeData = abi.encode(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries);
+
+        // Updates the sent erc20 assets to include the fees data.
+        _trade.sent = _updateERC20s(_trade.sent, encodedFeeData);
+        // Updates the received erc20 assets to include the fees data.
+        _trade.received = _updateERC20s(_trade.received, encodedFeeData);
+
+        // Returns the Trade with the modified assets to include fees and royalties.
+        return _trade;
+    }
+
+    /// @dev Obtains the fees and royalties from a provided list of assets.
+    /// ASSET_TYPE_COLLECTION_ITEM will pay fees to the fee collector.
+    /// ASSET_TYPE_ERC721 will pay royalties to the royalties receiver if there is one. Otherwise, it will pay fees to the fee collector.
+    function _getFeesData(bool _payFeeCollector, uint256 _royaltyBeneficiariesCount, address[] memory _royaltyBeneficiaries, Asset[] memory _assets)
+        private
+        view
+        returns (bool, uint256, address[] memory)
+    {
+        for (uint256 i = 0; i < _assets.length; i++) {
+            Asset memory asset = _assets[i];
+
+            if (asset.assetType == ASSET_TYPE_ERC721) {
+                // The returned value can be one of the following:
+                // - The beneficiary of the corresponding collection item of the asset.
+                // - The creator of the collection the asset belongs to. In case the beneficiary in the previous case is 0.
+                // - The 0 address. Indicating that the asset is not a collection nft.
+                address royaltyBeneficiary = royaltiesManager.getRoyaltiesReceiver(asset.contractAddress, asset.value);
+
+                // Track the royalties receiver for collection nfts.
+                if (royaltyBeneficiary != address(0)) {
+                    _royaltyBeneficiaries[_royaltyBeneficiariesCount] = royaltyBeneficiary;
+                    _royaltyBeneficiariesCount++;
+                } else {
+                    // Use the fee collector as the beneficiary for non collection nfts asset.
+                    _payFeeCollector = true;
+                }
+            } else if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM) {
+                // Collection items that are going to be minted will pay fees to the fee collector.
+                _payFeeCollector = true;
+            } else if (asset.assetType == ASSET_TYPE_ERC20_WITH_FEES) {
+                // The ASSET_TYPE_ERC20_WITH_FEES can only be used programmatically and set by this contract.
+                // Trades should not be signed with this kind of asset type, otherwise it will revert.
+                revert("ASSET_TYPE_ERC20_WITH_FEES not allowed");
+            }
+        }
+
+        return (_payFeeCollector, _royaltyBeneficiariesCount, _royaltyBeneficiaries);
+    }
+
+    /// @dev Updates ERC20 assets to include the fees data.
+    function _updateERC20s(Asset[] memory _assets, bytes memory _encodedFeeData) private pure returns (Asset[] memory) {
+        for (uint256 i = 0; i < _assets.length; i++) {
+            if (_assets[i].assetType == ASSET_TYPE_ERC20) {
+                _assets[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
+                _assets[i].extra = _encodedFeeData;
+            }
+        }
+
+        return _assets;
+    }
+
     /// @dev Overriden Marketplace function to transfer assets.
-    /// Handles the transfer of ERC20 with royalties and fees, ERC721 and Collection Items.
+    /// Handles the transfer of ERC721s and the minting of Collection Items. Also handles the transfer of ERC20s with fees.
     function _transferAsset(Asset memory _asset, address _from, address _signer, address _caller) internal override {
         uint256 assetType = _asset.assetType;
 
-        if (assetType == ASSET_TYPE_ERC20) {
-            _transferERC20WithCollectorFee(_asset, _from, feeCollector, feeRate);
+        if (assetType == ASSET_TYPE_ERC20_WITH_FEES) {
+            _transferERC20WithFees(_asset, _from);
         } else if (assetType == ASSET_TYPE_ERC721) {
             _transferERC721(_asset, _from);
         } else if (assetType == ASSET_TYPE_COLLECTION_ITEM) {
             _transferERC721CollectionItem(_asset, _signer, _caller);
-        } else if (assetType == ASSET_TYPE_ERC20_WITH_ROYALTIES) {
-            _transferERC20WithRoyalties(_asset, _signer);
         } else {
             revert UnsupportedAssetType(assetType);
         }
+    }
+
+    function _transferERC20WithFees(Asset memory _asset, address _from) private {
+        (bool payFeeCollector, uint256 royaltyBeneficiariesCount, address[] memory royaltyBeneficiaries) =
+            abi.decode(_asset.extra, (bool, uint256, address[]));
+
+        uint256 originalValue = _asset.value;
+        uint256 fees = 0;
+
+        IERC20 erc20 = IERC20(_asset.contractAddress);
+
+        if (payFeeCollector) {
+            fees = originalValue * feeRate / 1_000_000;
+
+            SafeERC20.safeTransferFrom(erc20, _from, feeCollector, fees);
+        }
+
+        if (royaltyBeneficiariesCount > 0) {
+            uint256 royaltyFees = originalValue * royaltiesRate / 1_000_000;
+            uint256 individualRoyaltyFee = royaltyFees / royaltyBeneficiariesCount;
+
+            for (uint256 i = 0; i < royaltyBeneficiariesCount; i++) {
+                SafeERC20.safeTransferFrom(erc20, _from, royaltyBeneficiaries[i], individualRoyaltyFee);
+            }
+
+            fees += royaltyFees;
+        }
+
+        SafeERC20.safeTransferFrom(erc20, _from, _asset.beneficiary, originalValue - fees);
     }
 
     /// @dev Transfers ERC721 assets.
@@ -98,7 +209,7 @@ contract DecentralandMarketplacePolygon is
         erc721.safeTransferFrom(_from, _asset.beneficiary, _asset.value);
     }
 
-    /// @dev Mints collection items to the beneficiary.
+    /// @dev Mints collection items.
     function _transferERC721CollectionItem(Asset memory _asset, address _signer, address _caller) private {
         ICollection collection = ICollection(_asset.contractAddress);
 
@@ -115,19 +226,6 @@ contract DecentralandMarketplacePolygon is
         itemIds[0] = _asset.value;
 
         collection.issueTokens(beneficiaries, itemIds);
-    }
-
-    /// @dev Transfers ERC20 tokens.
-    /// Transfers a percentage of the value to the royalties receiver.
-    function _transferERC20WithRoyalties(Asset memory _asset, address _from) private {
-        (address contractAddress, uint256 tokenId) = abi.decode(_asset.extra, (address, uint256));
-        address royaltiesReceiver = royaltiesManager.getRoyaltiesReceiver(contractAddress, tokenId);
-
-        if (royaltiesReceiver == address(0)) {
-            revert NoRoyaltiesReceiver();
-        }
-
-        _transferERC20WithCollectorFee(_asset, _from, royaltiesReceiver, royaltiesRate);
     }
 
     /// @dev Updates the royalties manager address.

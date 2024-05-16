@@ -43,6 +43,7 @@ contract DecentralandMarketplacePolygonHarness is DecentralandMarketplacePolygon
 abstract contract DecentralandMarketplaceTests is Test {
     address owner;
     address dao;
+    address royaltiesManager;
     VmSafe.Wallet signer;
     VmSafe.Wallet metaTxSigner;
     address other;
@@ -55,10 +56,11 @@ abstract contract DecentralandMarketplaceTests is Test {
         vm.selectFork(forkId);
         owner = 0x0E659A116e161d8e502F9036bAbDA51334F2667E;
         dao = 0xB08E3e7cc815213304d884C88cA476ebC50EaAB2;
+        royaltiesManager = 0x90958D4531258ca11D18396d4174a007edBc2b42;
         signer = vm.createWallet("signer");
         metaTxSigner = vm.createWallet("metaTxSigner");
         other = 0x79c63172C7B01A8a5B074EF54428a452E0794E7A;
-        marketplace = new DecentralandMarketplacePolygonHarness(owner, address(0), dao, 25_000, address(0), 25_000);
+        marketplace = new DecentralandMarketplacePolygonHarness(owner, address(0), dao, 25_000, royaltiesManager, 25_000);
     }
 
     function signTrade(DecentralandMarketplacePolygonHarness.Trade memory _trade) internal view returns (bytes memory) {
@@ -185,19 +187,13 @@ contract TransferERC20Tests is DecentralandMarketplaceTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForSent();
 
-        uint256 expectedFee = 0.025 ether;
-        uint256 daoBalance = erc20.balanceOf(dao);
-
         vm.prank(other);
         vm.expectEmit(address(erc20));
-        emit Transfer(signer.addr, other, erc20Sent - expectedFee);
-        vm.expectEmit(address(erc20));
-        emit Transfer(signer.addr, dao, expectedFee);
+        emit Transfer(signer.addr, other, erc20Sent);
         marketplace.accept(trades);
 
         assertEq(erc20.balanceOf(signer.addr), 0);
-        assertEq(erc20.balanceOf(other), erc20Sent - expectedFee);
-        assertEq(erc20.balanceOf(dao), daoBalance + expectedFee);
+        assertEq(erc20.balanceOf(other), erc20Sent);
     }
 
     function test_TransfersERC20FromCallerToSigner() public {
@@ -209,19 +205,13 @@ contract TransferERC20Tests is DecentralandMarketplaceTests {
 
         DecentralandMarketplacePolygonHarness.Trade[] memory trades = _getBaseTradesForReceived();
 
-        uint256 expectedFee = 0.025 ether;
-        uint256 daoBalance = erc20.balanceOf(dao);
-
         vm.prank(other);
         vm.expectEmit(address(erc20));
-        emit Transfer(other, signer.addr, erc20Sent - expectedFee);
-        vm.expectEmit(address(erc20));
-        emit Transfer(other, dao, expectedFee);
+        emit Transfer(other, signer.addr, erc20Sent);
         marketplace.accept(trades);
 
         assertEq(erc20.balanceOf(other), 0);
-        assertEq(erc20.balanceOf(signer.addr), erc20Sent - expectedFee);
-        assertEq(erc20.balanceOf(dao), daoBalance + expectedFee);
+        assertEq(erc20.balanceOf(signer.addr), erc20Sent);
     }
 }
 
