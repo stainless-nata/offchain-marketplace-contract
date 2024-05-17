@@ -94,21 +94,9 @@ contract DecentralandMarketplacePolygon is
         // Encodes the fees and royalties data to be stored in the assets.
         bytes memory endocodedFeeAndRoyaltyData = abi.encode(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries);
 
-        // Modify the sent assets to include the fees and royalties.
-        for (uint256 i = 0; i < sentLength; i++) {
-            if (_trade.sent[i].assetType == ASSET_TYPE_ERC20) {
-                _trade.sent[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
-                _trade.sent[i].extra = endocodedFeeAndRoyaltyData;
-            }
-        }
-
-        // Modify the received assets to include the fees and royalties.
-        for (uint256 i = 0; i < receivedLength; i++) {
-            if (_trade.received[i].assetType == ASSET_TYPE_ERC20) {
-                _trade.received[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
-                _trade.received[i].extra = endocodedFeeAndRoyaltyData;
-            }
-        }
+        // Update erc20 assets to include fee and royalties data.
+        _trade.sent = _updateERC20sWithFees(_trade.sent, endocodedFeeAndRoyaltyData);
+        _trade.received = _updateERC20sWithFees(_trade.received, endocodedFeeAndRoyaltyData);
 
         return _trade;
     }
@@ -144,6 +132,18 @@ contract DecentralandMarketplacePolygon is
         }
 
         return (_payFeeCollector, _royaltyBeneficiariesCount, _royaltyBeneficiaries);
+    }
+
+    /// @dev Iterate through the provided assets and update the ERC20 assets to include the fees and royalties data.
+    function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _endocodedFeeAndRoyaltyData) private view returns (Asset[] memory) {
+        for (uint256 i = 0; i < _assets.length; i++) {
+            if (_assets[i].assetType == ASSET_TYPE_ERC20) {
+                _assets[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
+                _assets[i].extra = _endocodedFeeAndRoyaltyData;
+            }
+        }
+
+        return _assets;
     }
 
     /// @dev Overriden Marketplace function to transfer assets.
