@@ -469,17 +469,28 @@ contract AcceptTests is MarketplaceTests {
         marketplace.accept(trades);
     }
 
-    function test_RevertsIfCallerNotAllowed() public {
+    function test_RevertsIfCallerNotAllowed_NoProof() public {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
-        trades[0].checks.allowed = new address[](100);
+        trades[0].checks.allowedRoot = 0x3760ed777a92c3c15784377c1323a9f14e6b22527504861052eae84c523e6940;
 
-        for (uint256 i = 0; i < trades[0].checks.allowed.length; i++) {
-            trades[0].checks.allowed[i] = vm.addr(i + 100);
-        }
+        vm.prank(0x0000000000000000000000000000000000000001);
+        vm.expectRevert(NotAllowed.selector);
+        marketplace.accept(trades);
+    }
 
-        vm.prank(other);
+    function test_RevertsIfCallerNotAllowed_InvalidProof() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.allowedRoot = 0x3760ed777a92c3c15784377c1323a9f14e6b22527504861052eae84c523e6940;
+        trades[0].checks.allowedProof = new bytes32[](3);
+        trades[0].checks.allowedProof[0] = 0xb868bdfa8727775661e4ccf117824a175a33f8703d728c04488fbfffcafda9f9;
+        trades[0].checks.allowedProof[1] = 0xc949c2dc5da2bd9a4f5ae27532dfbb3551487bed50825cd099ff5d0a8d613ab5;
+        trades[0].checks.allowedProof[2] = 0x5c5f637d4c3416c9b00567ede8dd9714445a6b076030f6b49d7607beea171ec5;
+
+        vm.prank(0x0000000000000000000000000000000000000002);
         vm.expectRevert(NotAllowed.selector);
         marketplace.accept(trades);
     }
@@ -488,16 +499,15 @@ contract AcceptTests is MarketplaceTests {
         MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
 
         trades[0].checks.expiration = block.timestamp;
-        trades[0].checks.allowed = new address[](100);
-
-        for (uint256 i = 0; i < trades[0].checks.allowed.length; i++) {
-            trades[0].checks.allowed[i] = vm.addr(i + 100); // 100 is an offset to avoid conflicts with other addresses.
-        }
-
+        trades[0].checks.allowedRoot = 0x3760ed777a92c3c15784377c1323a9f14e6b22527504861052eae84c523e6940;
+        trades[0].checks.allowedProof = new bytes32[](3);
+        trades[0].checks.allowedProof[0] = 0xb868bdfa8727775661e4ccf117824a175a33f8703d728c04488fbfffcafda9f9;
+        trades[0].checks.allowedProof[1] = 0xc949c2dc5da2bd9a4f5ae27532dfbb3551487bed50825cd099ff5d0a8d613ab5;
+        trades[0].checks.allowedProof[2] = 0x5c5f637d4c3416c9b00567ede8dd9714445a6b076030f6b49d7607beea171ec5;
         trades[0].signer = signer.addr;
         trades[0].signature = signTrade(trades[0]);
 
-        vm.prank(trades[0].checks.allowed[trades[0].checks.allowed.length - 1]);
+        vm.prank(0x0000000000000000000000000000000000000001);
         marketplace.accept(trades);
     }
 

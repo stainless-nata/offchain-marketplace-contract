@@ -135,7 +135,7 @@ contract DecentralandMarketplacePolygon is
     }
 
     /// @dev Iterate through the provided assets and update the ERC20 assets to include the fees and royalties data.
-    function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _endocodedFeeAndRoyaltyData) private view returns (Asset[] memory) {
+    function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _endocodedFeeAndRoyaltyData) private pure returns (Asset[] memory) {
         for (uint256 i = 0; i < _assets.length; i++) {
             if (_assets[i].assetType == ASSET_TYPE_ERC20) {
                 _assets[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+
 import {Signatures} from "src/common/Signatures.sol";
 import {CommonTypes} from "src/common/CommonTypes.sol";
 
@@ -55,8 +57,8 @@ abstract contract Verifications is Signatures, CommonTypes {
             revert Expired();
         }
 
-        if (_checks.allowed.length > 0) {
-            _verifyAllowed(_checks.allowed, _caller);
+        if (_checks.allowedRoot != 0) {
+            _verifyAllowed(_checks.allowedRoot, _checks.allowedProof, _caller);
         }
 
         if (_checks.externalChecks.length > 0) {
@@ -64,20 +66,20 @@ abstract contract Verifications is Signatures, CommonTypes {
         }
     }
 
-    function _verifyAllowed(address[] memory _allowed, address _caller) private pure {
-        for (uint256 j = 0; j < _allowed.length; j++) {
-            if (_allowed[j] == _caller) {
-                return;
-            }
+    /// @dev Verifies that the provided caller is allowed.
+    /// @param _allowedRoot The Merkle Root of the allowed addresses.
+    /// @param _allowedProof The Merkle Proof that validates that the caller is allowed.
+    /// @param _caller The address that sent the transaction.
+    function _verifyAllowed(bytes32 _allowedRoot, bytes32[] memory _allowedProof, address _caller) private pure {
+        if (!MerkleProof.verify(_allowedProof, _allowedRoot, keccak256(bytes.concat(keccak256(abi.encode(address(_caller))))))) {
+            revert NotAllowed();
         }
-
-        revert NotAllowed();
     }
 
     /// @dev Verifies that the external checks are met.
     /// @param _externalChecks The external checks to verify.
     /// @param _caller The address that sent the transaction.
-    /// 
+    ///
     /// External checks can be defined as required or optional. If any required check fails, the function will revert.
     /// Regarding optional checks, it only makes sense when there are more than one. If there is only one optional check, even if there are other required checks, it will be treated as required.
     /// For example:
