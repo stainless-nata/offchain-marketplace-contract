@@ -5,6 +5,7 @@ import {CommonTypes} from "src/common/CommonTypes.sol";
 import {CommonTypesHashing} from "src/common/CommonTypesHashing.sol";
 import {MarketplaceTypes} from "src/marketplace/MarketplaceTypes.sol";
 
+/// @notice Hashing functions for the Marketplace types. Used for EIP712 signatures.
 abstract contract MarketplaceTypesHashing is MarketplaceTypes, CommonTypesHashing {
     // keccak256("AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)")
     bytes32 private constant ASSET_WO_BENEFICIARY_TYPE_HASH = 0x7be57332caf51c5f0f0fa0e7c362534d22d81c0bee1ffac9b573acd336e032bd;
