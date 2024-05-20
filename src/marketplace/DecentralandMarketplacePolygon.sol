@@ -114,19 +114,19 @@ contract DecentralandMarketplacePolygon is
                 revert UnsupportedAssetType(ASSET_TYPE_ERC20_WITH_FEES);
             }
 
-            // ERC721 assets can be decentraland collection nfts or other nfts.
-            // Collection NFTs rely on the royalties manager contract to get the address of the royalties receiver.
-            // The royalties manager returns address(0) only for NFTs that are not collection nfts.
-            // For non collection NFTs and collection item minting, the fee collector should be paid.
             if (_assets[i].assetType == ASSET_TYPE_ERC721) {
+                // If the NFT is of a Decentraland Collection, the royalty beneficiary will be the item beneficiary or it's creator.
+                // If not, the royalty beneficiary will return address(0)
                 address royaltyBeneficiary = royaltiesManager.getRoyaltiesReceiver(_assets[i].contractAddress, _assets[i].value);
 
                 if (royaltyBeneficiary != address(0)) {
                     _royaltyBeneficiaries[_royaltyBeneficiariesCount++] = royaltyBeneficiary;
                 } else {
+                    // If the NFT is not a Decentraland Collection, the fee collector should be paid.
                     _payFeeCollector = true;
                 }
             } else if (_assets[i].assetType == ASSET_TYPE_COLLECTION_ITEM) {
+                // Minting Collection Items pay fees to the collector.
                 _payFeeCollector = true;
             }
         }
@@ -210,6 +210,10 @@ contract DecentralandMarketplacePolygon is
 
         address creator = collection.creator();
 
+        // This check verifies that at least the caller or the signer have to be the creator.
+        // This allows the following:
+        // 1. The creator creates a Trade to sell a collection item. Any user can accept the Trade an will be valid.
+        // 2. Any user creates a counter offer to buy a collection item. Only the creator should be able to accept the Trade.
         if (creator != _signer && creator != _caller) {
             revert NotCreator();
         }

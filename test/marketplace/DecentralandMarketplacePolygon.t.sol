@@ -242,6 +242,49 @@ contract TransferERC20Tests is DecentralandMarketplacePolygonTests {
         assertEq(erc20.balanceOf(other), 0);
         assertEq(erc20.balanceOf(signer.addr), erc20Sent);
     }
+
+    function test_TradeWithSentAndReceivedERC20() public {
+        vm.prank(other);
+        erc20.approve(address(marketplace), 1 ether);
+
+        vm.prank(signer.addr);
+        erc20.approve(address(marketplace), 2 ether);
+
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(other, 1 ether);
+
+        vm.prank(erc20OriginalHolder);
+        erc20.transfer(signer.addr, 2 ether);
+
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+
+        trades[0].received = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        trades[0].received[0].assetType = marketplace.ASSET_TYPE_ERC20();
+        trades[0].received[0].contractAddress = address(erc20);
+        trades[0].received[0].value = 1 ether;
+
+        trades[0].sent = new DecentralandMarketplacePolygonHarness.Asset[](1);
+        trades[0].sent[0].assetType = marketplace.ASSET_TYPE_ERC20();
+        trades[0].sent[0].contractAddress = address(erc20);
+        trades[0].sent[0].value = 2 ether;
+
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        uint256 signerBalance = erc20.balanceOf(signer.addr);
+        uint256 otherBalance = erc20.balanceOf(other);
+
+        vm.prank(other);
+        vm.expectEmit(address(erc20));
+        emit Transfer(signer.addr, other, 2 ether);
+        vm.expectEmit(address(erc20));
+        emit Transfer(other, signer.addr, 1 ether);
+        marketplace.accept(trades);
+
+        assertEq(erc20.balanceOf(signer.addr), signerBalance - 1 ether);
+        assertEq(erc20.balanceOf(other), otherBalance + 1 ether);
+    }
 }
 
 contract TransferERC721Tests is DecentralandMarketplacePolygonTests {
