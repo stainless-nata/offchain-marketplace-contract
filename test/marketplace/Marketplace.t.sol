@@ -511,6 +511,22 @@ contract AcceptTests is MarketplaceTests {
         marketplace.accept(trades);
     }
 
+    function test_CallerCanAcceptIfItIsInTheAllowedList_RootOfOneAddress() public {
+        MarketplaceHarness.Trade[] memory trades = new MarketplaceHarness.Trade[](1);
+
+        trades[0].checks.expiration = block.timestamp;
+        trades[0].checks.allowedRoot = 0xb5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22;
+        trades[0].signer = signer.addr;
+        trades[0].signature = signTrade(trades[0]);
+
+        vm.prank(0x0000000000000000000000000000000000000002);
+        vm.expectRevert(NotAllowed.selector);
+        marketplace.accept(trades);
+
+        vm.prank(0x0000000000000000000000000000000000000001);
+        marketplace.accept(trades);
+    }
+
     function test_RevertsIfBalanceOfRequiredExternalCheckFails() public {
         MockExternalChecks mockExternalChecks = new MockExternalChecks();
 
