@@ -114,11 +114,13 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
 
     function _updateMarketplace(address _marketplace) private {
         marketplace = _marketplace;
+
         emit MarketplaceUpdated(_msgSender(), _marketplace);
     }
 
     function _updateAllowedCoupons(address _coupon, bool _value) private {
         allowedCoupons[_coupon] = _value;
+
         emit AllowedCouponsUpdated(_msgSender(), _coupon, _value);
     }
 }

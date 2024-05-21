@@ -35,6 +35,7 @@ abstract contract Signatures is Ownable, EIP712 {
     /// Revokes all signatures created with a previous index.
     function increaseContractSignatureIndex() external onlyOwner {
         uint256 newIndex = ++contractSignatureIndex;
+
         emit ContractSignatureIndexIncreased(_msgSender(), newIndex);
     }
 
@@ -43,6 +44,7 @@ abstract contract Signatures is Ownable, EIP712 {
     function increaseSignerSignatureIndex() external {
         address caller = _msgSender();
         uint256 newIndex = ++signerSignatureIndex[caller];
+
         emit SignerSignatureIndexIncreased(caller, newIndex);
     }
 
@@ -51,6 +53,7 @@ abstract contract Signatures is Ownable, EIP712 {
     /// @param _hashedSignature The hash of the signature to cancel.
     function _cancelSignature(bytes32 _hashedSignature) internal {
         cancelledSignatures[_hashedSignature] = true;
+
         emit SignatureCancelled(_msgSender(), _hashedSignature);
     }
 
