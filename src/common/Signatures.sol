@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-
 import {EIP712} from "src/common/EIP712.sol";
 
 /// @dev Adds some functions to manage signatures.
@@ -21,7 +20,7 @@ abstract contract Signatures is Ownable, EIP712 {
     mapping(bytes32 => bool) public cancelledSignatures;
 
     /// @notice Mapping of signature uses.
-    /// Tracks how many times a signatures has been used.
+    /// Tracks how many times a signature has been used.
     /// Useful in case the signer wants to determine how many times a signature can be used.
     mapping(bytes32 => uint256) public signatureUses;
 
@@ -35,7 +34,6 @@ abstract contract Signatures is Ownable, EIP712 {
     /// Revokes all signatures created with a previous index.
     function increaseContractSignatureIndex() external onlyOwner {
         uint256 newIndex = ++contractSignatureIndex;
-
         emit ContractSignatureIndexIncreased(_msgSender(), newIndex);
     }
 
@@ -44,19 +42,16 @@ abstract contract Signatures is Ownable, EIP712 {
     function increaseSignerSignatureIndex() external {
         address caller = _msgSender();
         uint256 newIndex = ++signerSignatureIndex[caller];
-
         emit SignerSignatureIndexIncreased(caller, newIndex);
     }
 
-    /// @dev Useful to cancel a signatures so it cannot be used anymore.
+    /// @dev Useful to cancel a signature so it cannot be used anymore.
     /// The implementation should call this function after validating that the caller is the creator of the signature.
     /// @param _hashedSignature The hash of the signature to cancel.
     function _cancelSignature(bytes32 _hashedSignature) internal {
         cancelledSignatures[_hashedSignature] = true;
-
         emit SignatureCancelled(_msgSender(), _hashedSignature);
     }
-
 
     /// @dev Verifies that a signature has been signed by a particular signer.
     /// @param _typeHash The type hash.

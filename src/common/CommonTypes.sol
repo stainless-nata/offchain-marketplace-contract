@@ -24,7 +24,7 @@ abstract contract CommonTypes {
     /// @param salt A value used to make the signature unique.
     /// @param contractSignatureIndex The contract signature index required to validate the signature.
     /// @param signerSignatureIndex The signer signature index required to validate the signature.
-    /// @param allowedRoot The Merkle Root of of the allowed addresses. If empty, no check is performed.
+    /// @param allowedRoot The Merkle Root of the allowed addresses. If empty, no check is performed.
     /// @param allowedProof The Merkle Proof that validates that the caller is allowed. Is not validated in the signature given that it is data used by the caller.
     /// @param externalChecks The external checks to verify.
     struct Checks {
