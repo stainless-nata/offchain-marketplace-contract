@@ -99,6 +99,7 @@ abstract contract Verifications is Signatures, CommonTypes {
             bool isRequiredCheck = externalCheck.required;
 
             if (!isRequiredCheck && hasPassingOptionalCheck) {
+                // If there is already a passing optional check, there is no need to evaluate the others.
                 continue;
             }
 
@@ -106,21 +107,30 @@ abstract contract Verifications is Signatures, CommonTypes {
 
             bytes memory functionData;
 
-            if (selector == OWNER_OF_SELECTOR) {
+            if (selector == BALANCE_OF_SELECTOR) {
+                // balanceOf(address _user)
+                functionData = abi.encodeWithSelector(selector, _caller);
+            } else if (selector == OWNER_OF_SELECTOR) {
+                // ownerOf(uint256 _tokenId)
                 functionData = abi.encodeWithSelector(selector, externalCheck.value);
             } else {
-                functionData = abi.encodeWithSelector(selector, _caller);
+                // custom(address _user, uint256 _value)
+                functionData = abi.encodeWithSelector(selector, _caller, externalCheck.value);
             }
 
+            // Call the external contract to check the condition.
             (bool success, bytes memory data) = externalCheck.contractAddress.staticcall(functionData);
 
             if (!success) {
                 // Do nothing here, an unsuccessful call will be treated as a failed check later.
             } else if (selector == BALANCE_OF_SELECTOR) {
+                // Check that the returned balance is >= the provided value.
                 success = abi.decode(data, (uint256)) >= externalCheck.value;
             } else if (selector == OWNER_OF_SELECTOR) {
+                // Check that the owner of the nft is the caller.
                 success = abi.decode(data, (address)) == _caller;
             } else {
+                // Check that the custom function returned true.
                 success = abi.decode(data, (bool));
             }
 
@@ -130,14 +140,17 @@ abstract contract Verifications is Signatures, CommonTypes {
             }
 
             if (!isRequiredCheck) {
+                // Track that there is at least one optional check.
                 hasOptionalChecks = true;
 
                 if (success) {
+                    // Track that there is at least one passing optional check.
                     hasPassingOptionalCheck = true;
                 }
             }
         }
 
+        // Fails if there were optional checks and none of them passed.
         if (hasOptionalChecks && !hasPassingOptionalCheck) {
             revert ExternalChecksFailed();
         }

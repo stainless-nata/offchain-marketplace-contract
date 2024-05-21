@@ -26,7 +26,7 @@ contract MockExternalChecks {
         return balanceOfResult;
     }
 
-    function customCheckFunction(address) external view returns (bool) {
+    function customCheckFunction(address, uint256) external view returns (bool) {
         return customCheckFunctionResult;
     }
 }
