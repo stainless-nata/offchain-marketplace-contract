@@ -19,10 +19,10 @@ abstract contract CommonTypesHashing is CommonTypes {
 
             hashes[i] = keccak256(
                 abi.encode(
-                    EXTERNAL_CHECK_TYPE_HASH, 
-                    externalCheck.contractAddress, 
-                    externalCheck.selector, 
-                    externalCheck.value, 
+                    EXTERNAL_CHECK_TYPE_HASH,
+                    externalCheck.contractAddress,
+                    externalCheck.selector,
+                    externalCheck.value,
                     externalCheck.required
                 )
             );

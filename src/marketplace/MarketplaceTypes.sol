@@ -11,7 +11,7 @@ abstract contract MarketplaceTypes is CommonTypes {
     /// @param contractAddress Address of the contract of the asset.
     /// @param value Value of the asset. The amount for ERC20s, the ID for ERC721s, etc.
     /// @param beneficiary Address that will receive the asset. If empty, depending if the asset is sent or received, the beneficiary will be the signer or the caller.
-    /// In the case of sent assets. The beneficiary is not validated in the signature. This is to allow the caller to determine which address will receive the asset.
+    /// In the case of sent assets, the beneficiary is not validated in the signature. This is to allow the caller to determine which address will receive the asset.
     /// @param extra Extra data that can be used to store additional information. 
     struct Asset {
         uint256 assetType;

@@ -73,7 +73,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
     /// @notice Applies a Coupon to a Trade.
     /// @param _trade The Trade to apply the Coupon to.
     /// @param _coupon The Coupon to apply.
-    /// @return - The Trade with the Coupon applied.
+    /// @return The Trade with the Coupon applied.
     function applyCoupon(Trade calldata _trade, Coupon calldata _coupon) external virtual returns (Trade memory) {
         address caller = _msgSender();
 
@@ -96,7 +96,7 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
 
         // Verify that the check values provided in the Coupon are correct.
         _verifyChecks(_coupon.checks, hashedCouponSignature, currentSignatureUses, signer, caller);
-        // Verifiy that the Coupon signature is valid.
+        // Verify that the Coupon signature is valid.
         _verifyCouponSignature(_coupon, signer);
 
         emit CouponApplied(caller, hashedTradeSignature, hashedCouponSignature);
@@ -114,13 +114,11 @@ contract CouponManager is Verifications, CouponTypesHashing, MarketplaceTypes {
 
     function _updateMarketplace(address _marketplace) private {
         marketplace = _marketplace;
-
         emit MarketplaceUpdated(_msgSender(), _marketplace);
     }
 
     function _updateAllowedCoupons(address _coupon, bool _value) private {
         allowedCoupons[_coupon] = _value;
-
         emit AllowedCouponsUpdated(_msgSender(), _coupon, _value);
     }
 }

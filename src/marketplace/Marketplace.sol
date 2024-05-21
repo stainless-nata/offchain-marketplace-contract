@@ -7,7 +7,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Verifications} from "src/common/Verifications.sol";
 import {MarketplaceTypesHashing} from "src/marketplace/MarketplaceTypesHashing.sol";
 
-/// @notice Main Marketplace asbtract contract that contains the logic to validate and accept Trades.
+/// @notice Main Marketplace abstract contract that contains the logic to validate and accept Trades.
 abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausable, ReentrancyGuard {
     /// @notice Trade ids that have been already used.
     /// Trade ids are composed by hashing:
@@ -75,7 +75,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
     }
 
     /// @dev Accepts a Trade.
-    /// This function is internal to allow child contracts to using in their own accept function.
+    /// This function is internal to allow child contracts to use it in their own accept function.
     /// Does not perform any checks, only transfers the assets and emits the Traded event.
     function _accept(Trade memory _trade, address _caller) internal {
         Trade memory modifiedTrade = _modifyTrade(_trade);
@@ -115,7 +115,7 @@ abstract contract Marketplace is Verifications, MarketplaceTypesHashing, Pausabl
         _verifySignature(_hashTrade(_trade), _trade.signature, _signer);
     }
 
-    /// @dev Transfers all the provided assets using the overriden _transferAsset function.
+    /// @dev Transfers all the provided assets using the overridden _transferAsset function.
     /// Updates all the asset beneficiaries to the provided _to address in case the original beneficiary is the 0 address.
     function _transferAssets(Asset[] memory _assets, address _from, address _to, address _signer, address _caller) private {
         for (uint256 i = 0; i < _assets.length; i++) {

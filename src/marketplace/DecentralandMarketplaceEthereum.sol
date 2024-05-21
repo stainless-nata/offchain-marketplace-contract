@@ -19,7 +19,12 @@ contract DecentralandMarketplaceEthereum is DecentralandMarketplaceEthereumAsset
     /// @param _couponManager The address of the coupon manager contract.
     /// @param _feeCollector The address that will receive erc20 fees.
     /// @param _feeRate The rate of the fee. 25_000 is 2.5%
-    constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate)
+    constructor(
+        address _owner,
+        address _couponManager,
+        address _feeCollector,
+        uint256 _feeRate
+    ) 
         EIP712("DecentralandMarketplaceEthereum", "1.0.0")
         Ownable(_owner)
         MarketplaceWithCouponManager(_couponManager)
@@ -53,7 +58,7 @@ contract DecentralandMarketplaceEthereum is DecentralandMarketplaceEthereumAsset
     }
 
     /// @dev Transfers ERC20 assets to the beneficiary.
-    /// A part of the value is taken as a fee and transfered to the fee collector.
+    /// A part of the value is taken as a fee and transferred to the fee collector.
     function _transferERC20(Asset memory _asset, address _from) internal {
         uint256 originalValue = _asset.value;
         uint256 fee = originalValue * feeRate / 1_000_000;

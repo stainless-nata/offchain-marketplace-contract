@@ -24,7 +24,7 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
     }
 
     /// @notice Schema of the data expected from the caller.
-    /// @param proofs The Merkle proofs to validate that the collection items being traded are valid for the discount
+    /// @param proofs The Merkle proofs to validate that the collection items being traded are valid for the discount.
     struct CollectionDiscountCouponCallerData {
         bytes32[][] proofs;
     }
@@ -48,7 +48,7 @@ contract CollectionDiscountCoupon is DecentralandMarketplacePolygonAssetTypes, C
         CollectionDiscountCouponData memory data = abi.decode(_coupon.data, (CollectionDiscountCouponData));
         CollectionDiscountCouponCallerData memory callerData = abi.decode(_coupon.callerData, (CollectionDiscountCouponCallerData));
 
-        if (_trade.sent.length == 0 ||_trade.sent.length != callerData.proofs.length) {
+        if (_trade.sent.length == 0 || _trade.sent.length != callerData.proofs.length) {
             revert InvalidSentOrProofsLength();
         }
 

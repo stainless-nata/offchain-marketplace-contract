@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+
 import {Signatures} from "src/common/Signatures.sol";
 import {CommonTypes} from "src/common/CommonTypes.sol";
 

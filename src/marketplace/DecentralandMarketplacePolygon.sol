@@ -38,7 +38,14 @@ contract DecentralandMarketplacePolygon is
     /// @param _feeRate The rate of the fee. 25_000 is 2.5%
     /// @param _royaltiesManager The address of the royalties manager contract.
     /// @param _royaltiesRate The rate of the royalties. 25_000 is 2.5%
-    constructor(address _owner, address _couponManager, address _feeCollector, uint256 _feeRate, address _royaltiesManager, uint256 _royaltiesRate)
+    constructor(
+        address _owner,
+        address _couponManager,
+        address _feeCollector,
+        uint256 _feeRate,
+        address _royaltiesManager,
+        uint256 _royaltiesRate
+    ) 
         Ownable(_owner)
         MarketplaceWithCouponManager(_couponManager)
         FeeCollector(_feeCollector, _feeRate)
@@ -92,11 +99,11 @@ contract DecentralandMarketplacePolygon is
             _getFeesAndRoyalties(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries, _trade.received);
 
         // Encodes the fees and royalties data to be stored in the assets.
-        bytes memory endocodedFeeAndRoyaltyData = abi.encode(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries);
+        bytes memory encodedFeeAndRoyaltyData = abi.encode(payFeeCollector, royaltyBeneficiariesCount, royaltyBeneficiaries);
 
         // Update erc20 assets to include fee and royalties data.
-        _trade.sent = _updateERC20sWithFees(_trade.sent, endocodedFeeAndRoyaltyData);
-        _trade.received = _updateERC20sWithFees(_trade.received, endocodedFeeAndRoyaltyData);
+        _trade.sent = _updateERC20sWithFees(_trade.sent, encodedFeeAndRoyaltyData);
+        _trade.received = _updateERC20sWithFees(_trade.received, encodedFeeAndRoyaltyData);
 
         return _trade;
     }
@@ -115,7 +122,7 @@ contract DecentralandMarketplacePolygon is
             }
 
             if (_assets[i].assetType == ASSET_TYPE_ERC721) {
-                // If the NFT is of a Decentraland Collection, the royalty beneficiary will be the item beneficiary or it's creator.
+                // If the NFT is of a Decentraland Collection, the royalty beneficiary will be the item beneficiary or its creator.
                 // If not, the royalty beneficiary will return address(0)
                 address royaltyBeneficiary = royaltiesManager.getRoyaltiesReceiver(_assets[i].contractAddress, _assets[i].value);
 
@@ -135,11 +142,11 @@ contract DecentralandMarketplacePolygon is
     }
 
     /// @dev Iterate through the provided assets and update the ERC20 assets to include the fees and royalties data.
-    function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _endocodedFeeAndRoyaltyData) private pure returns (Asset[] memory) {
+    function _updateERC20sWithFees(Asset[] memory _assets, bytes memory _encodedFeeAndRoyaltyData) private pure returns (Asset[] memory) {
         for (uint256 i = 0; i < _assets.length; i++) {
             if (_assets[i].assetType == ASSET_TYPE_ERC20) {
                 _assets[i].assetType = ASSET_TYPE_ERC20_WITH_FEES;
-                _assets[i].extra = _endocodedFeeAndRoyaltyData;
+                _assets[i].extra = _encodedFeeAndRoyaltyData;
             }
         }
 
@@ -212,7 +219,7 @@ contract DecentralandMarketplacePolygon is
 
         // This check verifies that at least the caller or the signer have to be the creator.
         // This allows the following:
-        // 1. The creator creates a Trade to sell a collection item. Any user can accept the Trade an will be valid.
+        // 1. The creator creates a Trade to sell a collection item. Any user can accept the Trade and it will be valid.
         // 2. Any user creates a counter offer to buy a collection item. Only the creator should be able to accept the Trade.
         if (creator != _signer && creator != _caller) {
             revert NotCreator();
@@ -244,7 +251,7 @@ contract DecentralandMarketplacePolygon is
     }
 
     /// @dev Overriden function to obtain the caller of the transaction.
-    /// The contract accepts meta transactions, so the caller could be the signer of the meta transaction or the real caller depending the situation.
+    /// The contract accepts meta transactions, so the caller could be the signer of the meta transaction or the real caller depending on the situation.
     function _msgSender() internal view override returns (address) {
         return _getMsgSender();
     }

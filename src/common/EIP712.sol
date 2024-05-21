@@ -8,8 +8,8 @@ import {ShortStrings, ShortString} from "@openzeppelin/contracts/utils/ShortStri
 
 /**
  * @dev Modified implementation of OpenZeppelin's EIP712 to address specific requirements.
- * 
- * The original implementation can be found at: 
+ *
+ * The original implementation can be found at:
  * https://github.com/OpenZeppelin/openzeppelin-contracts/blob/dbb6104ce834628e473d2173bbc9d47f81a9eec3/contracts/utils/cryptography/EIP712.sol
  *
  * Changes from the OZ implementation include:

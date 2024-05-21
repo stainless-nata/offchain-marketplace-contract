@@ -22,8 +22,15 @@ abstract contract MarketplaceTypesHashing is MarketplaceTypes, CommonTypesHashin
         for (uint256 i = 0; i < hashes.length; i++) {
             Asset memory asset = _assets[i];
 
-            hashes[i] =
-                keccak256(abi.encode(ASSET_WO_BENEFICIARY_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra)));
+            hashes[i] = keccak256(
+                abi.encode(
+                    ASSET_WO_BENEFICIARY_TYPE_HASH,
+                    asset.assetType,
+                    asset.contractAddress,
+                    asset.value,
+                    keccak256(asset.extra)
+                )
+            );
         }
 
         return hashes;
@@ -35,8 +42,16 @@ abstract contract MarketplaceTypesHashing is MarketplaceTypes, CommonTypesHashin
         for (uint256 i = 0; i < hashes.length; i++) {
             Asset memory asset = _assets[i];
 
-            hashes[i] =
-                keccak256(abi.encode(ASSET_TYPE_HASH, asset.assetType, asset.contractAddress, asset.value, keccak256(asset.extra), asset.beneficiary));
+            hashes[i] = keccak256(
+                abi.encode(
+                    ASSET_TYPE_HASH,
+                    asset.assetType,
+                    asset.contractAddress,
+                    asset.value,
+                    keccak256(asset.extra),
+                    asset.beneficiary
+                )
+            );
         }
 
         return hashes;

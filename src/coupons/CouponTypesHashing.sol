@@ -11,7 +11,12 @@ abstract contract CouponTypesHashing is CouponTypes, CommonTypesHashing {
 
     function _hashCoupon(Coupon memory _coupon) internal pure returns (bytes32) {
         return keccak256(
-            abi.encode(COUPON_TYPE_HASH, keccak256(abi.encodePacked(_hashChecks(_coupon.checks))), _coupon.couponAddress, keccak256(_coupon.data))
+            abi.encode(
+                COUPON_TYPE_HASH, 
+                keccak256(abi.encodePacked(_hashChecks(_coupon.checks))), 
+                _coupon.couponAddress, 
+                keccak256(_coupon.data)
+            )
         );
     }
 }

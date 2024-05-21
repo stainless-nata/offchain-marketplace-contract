@@ -33,7 +33,7 @@ abstract contract MarketplaceWithCouponManager is Marketplace, CouponTypes {
             // It is important to verify the Trade before applying the coupons to avoid issues with the signature.
             _verifyTrade(_trades[i], caller);
 
-            // Modify the Trade with the coupon and accept it normaly.
+            // Modify the Trade with the coupon and accept it normally.
             _accept(couponManager.applyCoupon(_trades[i], _coupons[i]), caller);
         }
     }
