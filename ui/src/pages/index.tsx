@@ -1,274 +1,225 @@
-import Head from "next/head";
-import Image from "next/image";
 import { useMemo, useState } from "react";
-import { useWeb3ModalAccount, useWeb3ModalProvider } from "@web3modal/ethers/react";
-import { ethers } from "ethers";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
-import styles from "@/styles/Home.module.css";
+import { useWeb3ModalProvider } from "@web3modal/ethers/react";
+import { AbiCoder, ethers } from "ethers";
 
-const expiration = 2534279196; // 2050
-const chainId = 31337;
-const salt = ethers.zeroPadValue(ethers.toBeArray(chainId), 32);
-const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const MARKETPLACE = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const SALT = ethers.zeroPadValue(ethers.toBeArray(31337), 32);
 
 export default function Home() {
+  return (
+    <main>
+      <Signature />
+      <MerkleTree />
+    </main>
+  );
+}
+
+const Signature = () => {
   const { walletProvider } = useWeb3ModalProvider();
-  const { address } = useWeb3ModalAccount();
 
-  const [isNetworkSwitchHighlighted, setIsNetworkSwitchHighlighted] = useState(false);
-  const [isConnectHighlighted, setIsConnectHighlighted] = useState(false);
-  const [signature, setSignature] = useState("");
-
-  const closeAll = () => {
-    setIsNetworkSwitchHighlighted(false);
-    setIsConnectHighlighted(false);
-  };
-
-  const handleOnSign = async () => {
-    if (!walletProvider || !address) {
-      return;
+  const onSign = async () => {
+    if (!walletProvider) {
+      throw new Error("Wallet provider is not available");
     }
 
-    const provider = new ethers.BrowserProvider(walletProvider);
+    const browserProvider = new ethers.BrowserProvider(walletProvider);
 
-    const signer = await provider.getSigner();
+    const signer = await browserProvider.getSigner();
 
     const signature = await signer.signTypedData(
       {
         name: "Marketplace",
         version: "1.0.0",
-        verifyingContract: contractAddress,
-        salt,
+        verifyingContract: MARKETPLACE,
+        salt: SALT,
       },
       {
         Trade: [
-          {
-            name: "uses",
-            type: "uint256",
-          },
-          {
-            name: "expiration",
-            type: "uint256",
-          },
-          {
-            name: "effective",
-            type: "uint256",
-          },
-          {
-            name: "salt",
-            type: "bytes32",
-          },
-          {
-            name: "contractSignatureIndex",
-            type: "uint256",
-          },
-          {
-            name: "signerSignatureIndex",
-            type: "uint256",
-          },
-          {
-            name: "allowed",
-            type: "address[]",
-          },
-          {
-            name: "sent",
-            type: "AssetWithoutBeneficiary[]",
-          },
-          {
-            name: "received",
-            type: "Asset[]",
-          },
+          { name: "checks", type: "Checks" },
+          { name: "sent", type: "AssetWithoutBeneficiary[]" },
+          { name: "received", type: "Asset[]" },
         ],
         Asset: [
-          {
-            name: "assetType",
-            type: "uint256",
-          },
-          {
-            name: "contractAddress",
-            type: "address",
-          },
-          {
-            name: "value",
-            type: "uint256",
-          },
-          {
-            name: "extra",
-            type: "bytes",
-          },
-          {
-            name: "beneficiary",
-            type: "address",
-          },
+          { name: "assetType", type: "uint256" },
+          { name: "contractAddress", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "extra", type: "bytes" },
+          { name: "beneficiary", type: "address" },
         ],
         AssetWithoutBeneficiary: [
-          {
-            name: "assetType",
-            type: "uint256",
-          },
-          {
-            name: "contractAddress",
-            type: "address",
-          },
-          {
-            name: "value",
-            type: "uint256",
-          },
-          {
-            name: "extra",
-            type: "bytes",
-          },
+          { name: "assetType", type: "uint256" },
+          { name: "contractAddress", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "extra", type: "bytes" },
+        ],
+        Checks: [
+          { name: "uses", type: "uint256" },
+          { name: "expiration", type: "uint256" },
+          { name: "effective", type: "uint256" },
+          { name: "salt", type: "bytes32" },
+          { name: "contractSignatureIndex", type: "uint256" },
+          { name: "signerSignatureIndex", type: "uint256" },
+          { name: "allowedRoot", type: "bytes32" },
+          { name: "externalChecks", type: "ExternalCheck[]" },
+        ],
+        ExternalCheck: [
+          { name: "contractAddress", type: "address" },
+          { name: "selector", type: "bytes4" },
+          { name: "value", type: "uint256" },
+          { name: "required", type: "bool" },
         ],
       },
       {
-        uses: 1,
-        expiration,
-        effective: 0,
-        salt,
-        contractSignatureIndex: 0,
-        signerSignatureIndex: 0,
-        allowed: [address],
+        checks: {
+          uses: 1,
+          expiration: 2,
+          effective: 3,
+          salt: SALT,
+          contractSignatureIndex: 4,
+          signerSignatureIndex: 5,
+          allowedRoot: ethers.zeroPadValue(ethers.toBeArray(0), 32),
+          externalChecks: [
+            {
+              contractAddress: MARKETPLACE,
+              selector: "0x70a08231",
+              value: 1,
+              required: true,
+            },
+          ],
+        },
         sent: [
           {
-            assetType: 0,
-            contractAddress: ethers.ZeroAddress,
-            value: 1000,
-            extra: ethers.toUtf8Bytes("sdfgdsfgsdfgfsd"),
-          },
-          {
             assetType: 1,
-            contractAddress: ethers.ZeroAddress,
-            value: 532523462354,
-            extra: ethers.toUtf8Bytes("sadfasdgasdg"),
+            contractAddress: MARKETPLACE,
+            value: 1,
+            extra: AbiCoder.defaultAbiCoder().encode(["uint256", "address"], [1, MARKETPLACE]),
           },
         ],
         received: [
           {
-            assetType: 0,
-            contractAddress: ethers.ZeroAddress,
-            value: 1000,
-            extra: ethers.toUtf8Bytes("sdfgdsfgsdfgfsd"),
-            beneficiary: ethers.ZeroAddress,
-          },
-          {
             assetType: 1,
-            contractAddress: ethers.ZeroAddress,
-            value: 532523462354,
-            extra: ethers.toUtf8Bytes("sadfasdgasdg"),
-            beneficiary: address,
+            contractAddress: MARKETPLACE,
+            value: 1,
+            extra: AbiCoder.defaultAbiCoder().encode(["uint256", "address"], [1, MARKETPLACE]),
+            beneficiary: MARKETPLACE,
           },
         ],
       }
     );
 
-    setSignature(signature);
-  };
+    console.log("signature", signature);
 
-  const handleAccept = async () => {
-    if (!address || !walletProvider) {
-      return;
-    }
+    const abi = [
+      {
+        type: "function",
+        name: "accept",
+        inputs: [
+          {
+            name: "_trades",
+            type: "tuple[]",
+            internalType: "struct MarketplaceTypes.Trade[]",
+            components: [
+              { name: "signer", type: "address", internalType: "address" },
+              { name: "signature", type: "bytes", internalType: "bytes" },
+              {
+                name: "checks",
+                type: "tuple",
+                internalType: "struct CommonTypes.Checks",
+                components: [
+                  { name: "uses", type: "uint256", internalType: "uint256" },
+                  { name: "expiration", type: "uint256", internalType: "uint256" },
+                  { name: "effective", type: "uint256", internalType: "uint256" },
+                  { name: "salt", type: "bytes32", internalType: "bytes32" },
+                  { name: "contractSignatureIndex", type: "uint256", internalType: "uint256" },
+                  { name: "signerSignatureIndex", type: "uint256", internalType: "uint256" },
+                  { name: "allowedRoot", type: "bytes32", internalType: "bytes32" },
+                  { name: "allowedProof", type: "bytes32[]", internalType: "bytes32[]" },
+                  {
+                    name: "externalChecks",
+                    type: "tuple[]",
+                    internalType: "struct CommonTypes.ExternalCheck[]",
+                    components: [
+                      { name: "contractAddress", type: "address", internalType: "address" },
+                      { name: "selector", type: "bytes4", internalType: "bytes4" },
+                      { name: "value", type: "uint256", internalType: "uint256" },
+                      { name: "required", type: "bool", internalType: "bool" },
+                    ],
+                  },
+                ],
+              },
+              {
+                name: "sent",
+                type: "tuple[]",
+                internalType: "struct MarketplaceTypes.Asset[]",
+                components: [
+                  { name: "assetType", type: "uint256", internalType: "uint256" },
+                  { name: "contractAddress", type: "address", internalType: "address" },
+                  { name: "value", type: "uint256", internalType: "uint256" },
+                  { name: "beneficiary", type: "address", internalType: "address" },
+                  { name: "extra", type: "bytes", internalType: "bytes" },
+                ],
+              },
+              {
+                name: "received",
+                type: "tuple[]",
+                internalType: "struct MarketplaceTypes.Asset[]",
+                components: [
+                  { name: "assetType", type: "uint256", internalType: "uint256" },
+                  { name: "contractAddress", type: "address", internalType: "address" },
+                  { name: "value", type: "uint256", internalType: "uint256" },
+                  { name: "beneficiary", type: "address", internalType: "address" },
+                  { name: "extra", type: "bytes", internalType: "bytes" },
+                ],
+              },
+            ],
+          },
+        ],
+        outputs: [],
+        stateMutability: "nonpayable",
+      },
+    ];
 
-    const provider = new ethers.BrowserProvider(walletProvider);
-
-    const signer = await provider.getSigner();
-
-    const contract = new ethers.Contract(
-      contractAddress,
-      [
-        {
-          type: "function",
-          name: "accept",
-          inputs: [
-            {
-              name: "_trades",
-              type: "tuple[]",
-              internalType: "struct Marketplace.Trade[]",
-              components: [
-                { name: "signer", type: "address", internalType: "address" },
-                { name: "signature", type: "bytes", internalType: "bytes" },
-                { name: "uses", type: "uint256", internalType: "uint256" },
-                { name: "expiration", type: "uint256", internalType: "uint256" },
-                { name: "effective", type: "uint256", internalType: "uint256" },
-                { name: "salt", type: "bytes32", internalType: "bytes32" },
-                { name: "contractSignatureIndex", type: "uint256", internalType: "uint256" },
-                { name: "signerSignatureIndex", type: "uint256", internalType: "uint256" },
-                { name: "allowed", type: "address[]", internalType: "address[]" },
-                {
-                  name: "sent",
-                  type: "tuple[]",
-                  internalType: "struct Marketplace.Asset[]",
-                  components: [
-                    { name: "assetType", type: "uint256", internalType: "uint256" },
-                    { name: "contractAddress", type: "address", internalType: "address" },
-                    { name: "value", type: "uint256", internalType: "uint256" },
-                    { name: "extra", type: "bytes", internalType: "bytes" },
-                    { name: "beneficiary", type: "address", internalType: "address" },
-                  ],
-                },
-                {
-                  name: "received",
-                  type: "tuple[]",
-                  internalType: "struct Marketplace.Asset[]",
-                  components: [
-                    { name: "assetType", type: "uint256", internalType: "uint256" },
-                    { name: "contractAddress", type: "address", internalType: "address" },
-                    { name: "value", type: "uint256", internalType: "uint256" },
-                    { name: "extra", type: "bytes", internalType: "bytes" },
-                    { name: "beneficiary", type: "address", internalType: "address" },
-                  ],
-                },
-              ],
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-      ],
-      signer
-    );
+    const contract = new ethers.Contract(MARKETPLACE, abi, signer);
 
     await contract.accept([
       {
-        signer: address,
+        signer: signer.address,
         signature: signature,
-        uses: 1,
-        expiration,
-        effective: 0,
-        salt,
-        contractSignatureIndex: 0,
-        signerSignatureIndex: 0,
-        allowed: [address],
+        checks: {
+          uses: 1,
+          expiration: 2,
+          effective: 3,
+          salt: SALT,
+          contractSignatureIndex: 4,
+          signerSignatureIndex: 5,
+          allowedRoot: ethers.zeroPadValue(ethers.toBeArray(0), 32),
+          allowedProof: [],
+          externalChecks: [
+            {
+              contractAddress: MARKETPLACE,
+              selector: "0x70a08231",
+              value: 1,
+              required: true,
+            },
+          ],
+        },
         sent: [
           {
-            assetType: 0,
-            contractAddress: ethers.ZeroAddress,
-            value: 1000,
-            extra: ethers.toUtf8Bytes("sdfgdsfgsdfgfsd"),
-            beneficiary: ethers.ZeroAddress,
-          },
-          {
             assetType: 1,
-            contractAddress: ethers.ZeroAddress,
-            value: 532523462354,
-            extra: ethers.toUtf8Bytes("sadfasdgasdg"),
-            beneficiary: address,
+            contractAddress: MARKETPLACE,
+            value: 1,
+            extra: AbiCoder.defaultAbiCoder().encode(["uint256", "address"], [1, MARKETPLACE]),
+            beneficiary: MARKETPLACE,
           },
         ],
         received: [
           {
-            assetType: 0,
-            contractAddress: ethers.ZeroAddress,
-            value: 1000,
-            extra: ethers.toUtf8Bytes("sdfgdsfgsdfgfsd"),
-            beneficiary: ethers.ZeroAddress,
-          },
-          {
             assetType: 1,
-            contractAddress: ethers.ZeroAddress,
-            value: 532523462354,
-            extra: ethers.toUtf8Bytes("sadfasdgasdg"),
-            beneficiary: address,
+            contractAddress: MARKETPLACE,
+            value: 1,
+            extra: AbiCoder.defaultAbiCoder().encode(["uint256", "address"], [1, MARKETPLACE]),
+            beneficiary: MARKETPLACE,
           },
         ],
       },
@@ -276,11 +227,13 @@ export default function Home() {
   };
 
   return (
-    <main>
-      <MerkleTree />
-    </main>
+    <div>
+      <h1>Signature</h1>
+      <w3m-button />
+      <button onClick={onSign}>Sign</button>
+    </div>
   );
-}
+};
 
 const MerkleTree = () => {
   const values = [
