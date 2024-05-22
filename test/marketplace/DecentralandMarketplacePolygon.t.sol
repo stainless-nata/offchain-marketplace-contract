@@ -780,6 +780,8 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
 
     event Transfer(address indexed from, address indexed to, uint256 value);
 
+    error TradesAndCouponsLengthMismatch();
+
     function setUp() public override {
         super.setUp();
 
@@ -1031,6 +1033,15 @@ contract ExampleTests is DecentralandMarketplacePolygonTests {
         assertEq(collection.ownerOf(1053122916685571866979180276836704323188950954005491112543109775772), other);
         assertEq(erc20.balanceOf(dao), daoBalance + 1.25 ether);
         assertEq(erc20.balanceOf(signer.addr), signerBalance + 48.75 ether);
+    }
+
+    function test_TradeERC721ForERC20_ERC721IsCollectionNFT_ApplyCollectionDiscountCoupon_RevertsIfTradesAndCouponsLengthMissmatch() public {
+        DecentralandMarketplacePolygonHarness.Trade[] memory trades = new DecentralandMarketplacePolygonHarness.Trade[](1);
+        DecentralandMarketplacePolygonHarness.Coupon[] memory coupons = new DecentralandMarketplacePolygonHarness.Coupon[](0);
+
+        vm.prank(other);
+        vm.expectRevert(TradesAndCouponsLengthMismatch.selector);
+        marketplace.acceptWithCoupon(trades, coupons);
     }
 
     function test_RevertsIfReceivedAssetTypeIsErc20WithFees() public {
