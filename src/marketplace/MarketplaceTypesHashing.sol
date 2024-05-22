@@ -13,10 +13,10 @@ abstract contract MarketplaceTypesHashing is MarketplaceTypes, CommonTypesHashin
     // keccak256("Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)")
     bytes32 private constant ASSET_TYPE_HASH = 0xe5f9e1ebc316d1bde562c77f47da7dc2cccb903eb04f9b82e29212b96f9e57e1;
 
-    // keccak256("Trade(Checks checks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,bytes32 allowedRoot,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
-    bytes32 private constant TRADE_TYPE_HASH = 0x75be7b0d04175c5f613f51b7096e680efbd2de7204cd11d89b5147544b90876b;
+    // keccak256("Trade(Checks checks,AssetWithoutBeneficiary[] sent,Asset[] received)Asset(uint256 assetType,address contractAddress,uint256 value,bytes extra,address beneficiary)AssetWithoutBeneficiary(uint256 assetType,address contractAddress,uint256 value,bytes extra)Checks(uint256 uses,uint256 expiration,uint256 effective,bytes32 salt,uint256 contractSignatureIndex,uint256 signerSignatureIndex,bytes32 allowedRoot,ExternalCheck[] externalChecks)ExternalCheck(address contractAddress,bytes4 selector,uint256 value,bool required)")
+    bytes32 private constant TRADE_TYPE_HASH = 0x2e3161a9b077618858f908c6d4f2da795186a6f319091c9a75f49dcdeaab8841;
 
-    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32[] memory) {
+    function _hashAssetsWithoutBeneficiary(Asset[] memory _assets) private pure returns (bytes32) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
@@ -33,10 +33,10 @@ abstract contract MarketplaceTypesHashing is MarketplaceTypes, CommonTypesHashin
             );
         }
 
-        return hashes;
+        return keccak256(abi.encodePacked(hashes));
     }
 
-    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32[] memory) {
+    function _hashAssets(Asset[] memory _assets) private pure returns (bytes32) {
         bytes32[] memory hashes = new bytes32[](_assets.length);
 
         for (uint256 i = 0; i < hashes.length; i++) {
@@ -54,16 +54,16 @@ abstract contract MarketplaceTypesHashing is MarketplaceTypes, CommonTypesHashin
             );
         }
 
-        return hashes;
+        return keccak256(abi.encodePacked(hashes));
     }
 
     function _hashTrade(Trade memory _trade) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
                 TRADE_TYPE_HASH,
-                keccak256(abi.encodePacked(_hashChecks(_trade.checks))),
-                keccak256(abi.encodePacked(_hashAssetsWithoutBeneficiary(_trade.sent))),
-                keccak256(abi.encodePacked(_hashAssets(_trade.received)))
+                _hashChecks(_trade.checks),
+                _hashAssetsWithoutBeneficiary(_trade.sent),
+                _hashAssets(_trade.received)
             )
         );
     }
