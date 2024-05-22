@@ -128,6 +128,7 @@ contract ApplyCouponTests is CouponsTests {
     error UnauthorizedCaller(address _caller);
     error CouponNotAllowed(address _coupon);
     error Expired();
+    error SignatureReuse();
 
     function test_RevertsIfCallerIsNotTheMarketplace() public {
         CouponManagerHarness.Trade memory trade;
@@ -168,6 +169,24 @@ contract ApplyCouponTests is CouponsTests {
 
         vm.prank(marketplace);
         vm.expectRevert(InvalidSignature.selector);
+        couponManager.applyCoupon(trade, coupon);
+    }
+
+    function test_RevertsIfSignatureHasAlreadyBeenUsed() public {
+        CouponManagerHarness.Trade memory trade;
+        trade.signer = signer.addr;
+
+        CouponManagerHarness.Coupon memory coupon;
+        coupon.couponAddress = allowedCoupon;
+        coupon.checks.expiration = block.timestamp;
+        coupon.checks.uses = 1;
+        coupon.signature = signCoupon(coupon);
+
+        vm.prank(marketplace);
+        couponManager.applyCoupon(trade, coupon);
+
+        vm.prank(marketplace);
+        vm.expectRevert(SignatureReuse.selector);
         couponManager.applyCoupon(trade, coupon);
     }
 
